@@ -76,3 +76,62 @@ jobs:
       - name: cargo test (thermo feature)
         working-directory: ProLance
         run: cargo test -p prolance-ms --features thermo --test thermo_adapter
+
+  python:
+    name: Python bindings
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout ProLance
+        uses: actions/checkout@v4
+        with:
+          path: ProLance
+
+      - name: Checkout OpenTFRaw
+        uses: actions/checkout@v4
+        with:
+          repository: Sigilweaver/OpenTFRaw
+          path: OpenTFRaw
+
+      - name: Checkout OpenTDF
+        uses: actions/checkout@v4
+        with:
+          repository: Sigilweaver/OpenTimsTDF
+          path: OpenTDF
+
+      - name: Checkout OpenWRaw
+        uses: actions/checkout@v4
+        with:
+          repository: Sigilweaver/OpenWRaw
+          path: OpenWRaw
+
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ProLance
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install maturin + pytest
+        run: pip install --upgrade pip maturin pytest
+
+      - name: Build wheel
+        working-directory: ProLance/crates/prolance-py
+        run: maturin build --release --interpreter python3 --out dist
+
+      - name: Install wheel
+        working-directory: ProLance/crates/prolance-py
+        run: pip install --force-reinstall dist/prolance-*.whl
+
+      - name: pytest
+        working-directory: ProLance/crates/prolance-py
+        run: pytest tests/ -q
