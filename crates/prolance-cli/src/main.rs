@@ -42,6 +42,33 @@ enum Cmd {
         #[arg(long)]
         out: String,
     },
+    /// Build the default scalar indexes on the spectra and runs
+    /// tables (BTree on run_id, scan_num, rt; Bitmap on ms_level).
+    Index {
+        #[arg(long)]
+        store: String,
+    },
+    /// Range-query spectra in a retention-time window for a run.
+    /// Prints one summary line per spectrum (scan_num, ms_level,
+    /// rt, peak count, tic).
+    Query {
+        #[arg(long)]
+        store: String,
+        #[arg(long)]
+        run_id: String,
+        /// Retention-time lower bound in seconds (inclusive).
+        #[arg(long)]
+        rt_min: Option<f64>,
+        /// Retention-time upper bound in seconds (inclusive).
+        #[arg(long)]
+        rt_max: Option<f64>,
+        /// Restrict to one MS level (e.g. --ms-level 1).
+        #[arg(long)]
+        ms_level: Option<u8>,
+        /// Maximum rows to print.
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+    },
 }
 
 #[tokio::main]
@@ -51,6 +78,15 @@ async fn main() -> Result<()> {
         Cmd::Ingest { store, inputs } => cmd_ingest(&store, &inputs).await,
         Cmd::Runs { store } => cmd_runs(&store).await,
         Cmd::Export { store, run_id, out } => cmd_export(&store, &run_id, &out).await,
+        Cmd::Index { store } => cmd_index(&store).await,
+        Cmd::Query {
+            store,
+            run_id,
+            rt_min,
+            rt_max,
+            ms_level,
+            limit,
+        } => cmd_query(&store, &run_id, rt_min, rt_max, ms_level, limit).await,
     }
 }
 
@@ -213,5 +249,60 @@ async fn cmd_export(store: &str, run_id: &str, out: &str) -> Result<()> {
         chromatograms.len(),
         path.display()
     );
+    Ok(())
+}
+
+async fn cmd_index(store: &str) -> Result<()> {
+    let s = Store::open(store).await?;
+    s.create_default_indexes()
+        .await
+        .context("create default indexes")?;
+    eprintln!("created default scalar indexes on spectra and runs tables");
+    Ok(())
+}
+
+async fn cmd_query(
+    store: &str,
+    run_id: &str,
+    rt_min: Option<f64>,
+    rt_max: Option<f64>,
+    ms_level: Option<u8>,
+    limit: usize,
+) -> Result<()> {
+    let s = Store::open(store).await?;
+    let batches = s
+        .query_window(
+            run_id,
+            rt_min.unwrap_or(f64::NEG_INFINITY),
+            rt_max.unwrap_or(f64::INFINITY),
+            ms_level,
+        )
+        .await?;
+    let spectra = batches_to_spectra(&batches);
+    let total = spectra.len();
+    eprintln!(
+        "matched {} spectra (run={}, rt=[{:?},{:?}], ms_level={:?})",
+        total, run_id, rt_min, rt_max, ms_level
+    );
+    println!(
+        "{:>8} {:>9} {:>12} {:>10} {:>14}",
+        "scan", "ms_level", "rt_sec", "n_peaks", "tic"
+    );
+    for s in spectra.iter().take(limit) {
+        println!(
+            "{:>8} {:>9} {:>12.3} {:>10} {:>14.3e}",
+            s.scan_num,
+            s.ms_level,
+            s.rt.unwrap_or(0.0),
+            s.mz.len(),
+            s.tic.unwrap_or(0.0)
+        );
+    }
+    if total > limit {
+        eprintln!(
+            "(showing first {} of {}; use --limit to expand)",
+            limit, total
+        );
+    }
     Ok(())
 }
