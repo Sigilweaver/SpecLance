@@ -42,8 +42,8 @@ flate2        = "1"
 memchr        = "2"
 
 # Vendor readers (path deps - sibling projects)
-opentfraw     = { path = "../OpenTFRaw" }
-opentimstdf   = { path = "../OpenTDF" }
+opentfraw     = { path = "../OpenTFRaw/crates/opentfraw" }
+opentimstdf   = { path = "../OpenTDF/crates/opentimstdf" }
 openwraw      = { path = "../OpenWRaw/crates/openwraw" }
 
 # Internal crates
