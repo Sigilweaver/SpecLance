@@ -53,6 +53,10 @@ pub struct Verbatim {
 }
 
 /// Parse an mzML file into a [`MzmlData`] bundle.
+///
+/// Buffers the whole file in memory and accumulates all spectra. For
+/// large files (multi-GB mzML), prefer [`MzmlIngest`] which yields
+/// spectra one at a time without materialising the full `Vec<Spectrum>`.
 pub fn read_mzml<P: AsRef<Path>>(path: P) -> MsResult<MzmlData> {
     let path = path.as_ref();
     let bytes = std::fs::read(path)?;
@@ -60,79 +64,183 @@ pub fn read_mzml<P: AsRef<Path>>(path: P) -> MsResult<MzmlData> {
 }
 
 /// Parse mzML bytes directly (useful for tests).
+///
+/// Equivalent to draining [`MzmlIngest::open_bytes`] into a single
+/// `MzmlData`.
 pub fn parse_bytes(bytes: &[u8], source_path: String) -> MsResult<MzmlData> {
-    let mut verbatim = Verbatim {
-        indexed: looks_indexed(bytes),
-        ..Default::default()
-    };
-
-    let spec_list_open_start = find_tag_open(bytes, b"spectrumList")
-        .ok_or_else(|| MsError::Malformed("no <spectrumList> found".into()))?;
-    let spec_list_open_end = find_tag_close(bytes, spec_list_open_start)
-        .ok_or_else(|| MsError::Malformed("malformed <spectrumList> open".into()))?;
-    verbatim.prefix = strip_indexed_prefix(&bytes[..spec_list_open_start]);
-    verbatim.spectrum_list_open =
-        String::from_utf8_lossy(&bytes[spec_list_open_start..=spec_list_open_end]).into_owned();
-
-    let spec_list_close = find_subslice(bytes, b"</spectrumList>", spec_list_open_end + 1)
-        .ok_or_else(|| MsError::Malformed("no </spectrumList> found".into()))?;
-    let after_spec_list = spec_list_close + b"</spectrumList>".len();
-
-    let chrom_list_open_start = find_tag_open_after(bytes, b"chromatogramList", after_spec_list);
-    let inter_end = chrom_list_open_start.unwrap_or(after_spec_list);
-    verbatim.inter = String::from_utf8_lossy(&bytes[after_spec_list..inter_end]).into_owned();
-
-    if let Some(cls) = chrom_list_open_start {
-        let cls_end = find_tag_close(bytes, cls)
-            .ok_or_else(|| MsError::Malformed("malformed <chromatogramList> open".into()))?;
-        verbatim.chromatogram_list_open =
-            Some(String::from_utf8_lossy(&bytes[cls..=cls_end]).into_owned());
-        let chrom_close = find_subslice(bytes, b"</chromatogramList>", cls_end + 1)
-            .ok_or_else(|| MsError::Malformed("no </chromatogramList> found".into()))?;
-        let after_chrom = chrom_close + b"</chromatogramList>".len();
-        verbatim.suffix = strip_indexed_suffix(&bytes[after_chrom..]);
-    } else {
-        verbatim.suffix = strip_indexed_suffix(&bytes[after_spec_list..]);
-    }
-
-    let run_id = derive_run_id(&source_path, bytes.len() as u64);
-    let mut run = Run {
-        run_id: run_id.clone(),
-        source_path: Some(source_path.clone()),
-        source_format: "mzml".into(),
-        ingested_at: Some(chrono::Utc::now().to_rfc3339()),
-        ..Default::default()
-    };
-    extract_run_attrs(&verbatim.prefix, &mut run);
-
-    let spectra = parse_spectra(&bytes[spec_list_open_end + 1..spec_list_close], &run_id)?;
-    let chromatograms = if let Some(cls) = chrom_list_open_start {
-        let cls_end = find_tag_close(bytes, cls).unwrap();
-        let chrom_close = find_subslice(bytes, b"</chromatogramList>", cls_end + 1).unwrap();
-        parse_chromatograms(&bytes[cls_end + 1..chrom_close], &run_id)?
-    } else {
-        Vec::new()
-    };
-
+    let mut ingest = MzmlIngest::open_bytes(bytes.to_vec(), source_path)?;
+    let mut spectra = Vec::new();
     let mut ms1 = 0u32;
     let mut ms2 = 0u32;
-    for s in &spectra {
+    while let Some(s) = ingest.next_spectrum()? {
         if s.ms_level == 1 {
             ms1 += 1;
         } else if s.ms_level >= 2 {
             ms2 += 1;
         }
+        spectra.push(s);
     }
-    run.spectrum_count = Some(spectra.len() as u32);
-    run.ms1_count = Some(ms1);
-    run.ms2_count = Some(ms2);
-    run.run_metadata = Some(serde_json::to_string(&verbatim)?);
-
+    let chromatograms = ingest.read_chromatograms()?;
+    let run = ingest.finalize_run(spectra.len() as u32, ms1, ms2)?;
     Ok(MzmlData {
         run,
         spectra,
         chromatograms,
     })
+}
+
+/// Streaming ingest cursor over an mzML document.
+///
+/// `MzmlIngest` parses the verbatim prefix/suffix and the
+/// `<spectrumList>` and `<chromatogramList>` ranges up front, but
+/// defers spectrum parsing until [`next_spectrum`](Self::next_spectrum)
+/// is called. Callers can drive the cursor in a loop, flushing each
+/// `Spectrum` to a downstream sink (e.g. `Store::append_spectra`) and
+/// dropping it before parsing the next one. This bounds peak-array
+/// memory to a single spectrum plus the source byte buffer, which lets
+/// us ingest multi-GB mzML files without OOM.
+pub struct MzmlIngest {
+    bytes: Vec<u8>,
+    source_path: String,
+    run_id: String,
+    verbatim: Verbatim,
+    base_run: Run,
+    body_end: usize,
+    cursor: usize,
+    chrom_range: Option<(usize, usize)>,
+}
+
+impl MzmlIngest {
+    /// Open an mzML file for streaming ingest.
+    pub fn open<P: AsRef<Path>>(path: P) -> MsResult<Self> {
+        let path = path.as_ref();
+        let bytes = std::fs::read(path)?;
+        Self::open_bytes(bytes, path.to_string_lossy().to_string())
+    }
+
+    /// Open an in-memory mzML byte buffer for streaming ingest.
+    pub fn open_bytes(bytes: Vec<u8>, source_path: String) -> MsResult<Self> {
+        let mut verbatim = Verbatim {
+            indexed: looks_indexed(&bytes),
+            ..Default::default()
+        };
+
+        let spec_list_open_start = find_tag_open(&bytes, b"spectrumList")
+            .ok_or_else(|| MsError::Malformed("no <spectrumList> found".into()))?;
+        let spec_list_open_end = find_tag_close(&bytes, spec_list_open_start)
+            .ok_or_else(|| MsError::Malformed("malformed <spectrumList> open".into()))?;
+        verbatim.prefix = strip_indexed_prefix(&bytes[..spec_list_open_start]);
+        verbatim.spectrum_list_open =
+            String::from_utf8_lossy(&bytes[spec_list_open_start..=spec_list_open_end]).into_owned();
+
+        let spec_list_close = find_subslice(&bytes, b"</spectrumList>", spec_list_open_end + 1)
+            .ok_or_else(|| MsError::Malformed("no </spectrumList> found".into()))?;
+        let after_spec_list = spec_list_close + b"</spectrumList>".len();
+
+        let chrom_list_open_start =
+            find_tag_open_after(&bytes, b"chromatogramList", after_spec_list);
+        let inter_end = chrom_list_open_start.unwrap_or(after_spec_list);
+        verbatim.inter = String::from_utf8_lossy(&bytes[after_spec_list..inter_end]).into_owned();
+
+        let chrom_range = if let Some(cls) = chrom_list_open_start {
+            let cls_end = find_tag_close(&bytes, cls)
+                .ok_or_else(|| MsError::Malformed("malformed <chromatogramList> open".into()))?;
+            verbatim.chromatogram_list_open =
+                Some(String::from_utf8_lossy(&bytes[cls..=cls_end]).into_owned());
+            let chrom_close = find_subslice(&bytes, b"</chromatogramList>", cls_end + 1)
+                .ok_or_else(|| MsError::Malformed("no </chromatogramList> found".into()))?;
+            let after_chrom = chrom_close + b"</chromatogramList>".len();
+            verbatim.suffix = strip_indexed_suffix(&bytes[after_chrom..]);
+            Some((cls_end + 1, chrom_close))
+        } else {
+            verbatim.suffix = strip_indexed_suffix(&bytes[after_spec_list..]);
+            None
+        };
+
+        let run_id = derive_run_id(&source_path, bytes.len() as u64);
+        let mut base_run = Run {
+            run_id: run_id.clone(),
+            source_path: Some(source_path.clone()),
+            source_format: "mzml".into(),
+            ingested_at: Some(chrono::Utc::now().to_rfc3339()),
+            ..Default::default()
+        };
+        extract_run_attrs(&verbatim.prefix, &mut base_run);
+
+        Ok(Self {
+            body_end: spec_list_close,
+            cursor: spec_list_open_end + 1,
+            chrom_range,
+            bytes,
+            source_path,
+            run_id,
+            verbatim,
+            base_run,
+        })
+    }
+
+    /// Stable run identifier derived from the source path and size.
+    pub fn run_id(&self) -> &str {
+        &self.run_id
+    }
+
+    /// Source path the ingest was opened from.
+    pub fn source_path(&self) -> &str {
+        &self.source_path
+    }
+
+    /// Run header populated from the verbatim prefix. Counts are not
+    /// filled in until [`finalize_run`](Self::finalize_run) is called.
+    pub fn run(&self) -> &Run {
+        &self.base_run
+    }
+
+    /// Parse the next `<spectrum>` element from the spectrum list.
+    ///
+    /// Returns `Ok(None)` once the cursor passes the closing
+    /// `</spectrumList>`.
+    pub fn next_spectrum(&mut self) -> MsResult<Option<Spectrum>> {
+        if self.cursor >= self.body_end {
+            return Ok(None);
+        }
+        let body = &self.bytes[self.cursor..self.body_end];
+        let rel = match memchr::memmem::find(body, b"<spectrum ") {
+            Some(i) => i,
+            None => {
+                self.cursor = self.body_end;
+                return Ok(None);
+            }
+        };
+        let start = self.cursor + rel;
+        let close_rel = memchr::memmem::find(&self.bytes[start..self.body_end], b"</spectrum>")
+            .ok_or_else(|| MsError::Malformed("no </spectrum>".into()))?;
+        let elem_end = start + close_rel + b"</spectrum>".len();
+        let xml = std::str::from_utf8(&self.bytes[start..elem_end])
+            .map_err(|e| MsError::Malformed(e.to_string()))?;
+        let spec = parse_one_spectrum(xml, &self.run_id)?;
+        self.cursor = elem_end;
+        Ok(Some(spec))
+    }
+
+    /// Parse all chromatograms in `<chromatogramList>` (or an empty
+    /// vector if absent).
+    pub fn read_chromatograms(&self) -> MsResult<Vec<Chromatogram>> {
+        match self.chrom_range {
+            Some((s, e)) => parse_chromatograms(&self.bytes[s..e], &self.run_id),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// Build the final [`Run`] record with the supplied counts and the
+    /// verbatim metadata blob attached.
+    pub fn finalize_run(self, spectrum_count: u32, ms1: u32, ms2: u32) -> MsResult<Run> {
+        let mut run = self.base_run;
+        run.spectrum_count = Some(spectrum_count);
+        run.ms1_count = Some(ms1);
+        run.ms2_count = Some(ms2);
+        run.run_metadata = Some(serde_json::to_string(&self.verbatim)?);
+        Ok(run)
+    }
 }
 
 // ── verbatim helpers ─────────────────────────────────────────────────────────
@@ -250,22 +358,6 @@ fn attr_value_search(haystack: &str, name_attr: &str) -> Option<String> {
 }
 
 // ── structured parsing ──────────────────────────────────────────────────────
-
-fn parse_spectra(body: &[u8], run_id: &str) -> MsResult<Vec<Spectrum>> {
-    let mut out = Vec::new();
-    let body_str = std::str::from_utf8(body).map_err(|e| MsError::Malformed(e.to_string()))?;
-    let mut pos = 0;
-    while let Some(rel) = body_str[pos..].find("<spectrum ") {
-        let start = pos + rel;
-        let close_rel = body_str[start..]
-            .find("</spectrum>")
-            .ok_or_else(|| MsError::Malformed("no </spectrum>".into()))?;
-        let elem_end = start + close_rel + "</spectrum>".len();
-        out.push(parse_one_spectrum(&body_str[start..elem_end], run_id)?);
-        pos = elem_end;
-    }
-    Ok(out)
-}
 
 fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
     let mut spec = Spectrum {

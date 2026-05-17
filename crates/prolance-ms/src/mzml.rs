@@ -12,5 +12,5 @@
 mod reader;
 mod writer;
 
-pub use reader::{parse_bytes, read_mzml, MzmlData, Verbatim};
+pub use reader::{parse_bytes, read_mzml, MzmlData, MzmlIngest, Verbatim};
 pub use writer::write_mzml;
