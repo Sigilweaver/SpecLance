@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use prolance_core::{batches_to_chromatograms, batches_to_runs, batches_to_spectra, Store};
-use prolance_ms::mzml::{read_mzml, write_mzml};
+use prolance_ms::mzml::{write_mzml, MzmlIngest};
 
 #[derive(Parser)]
 #[command(
@@ -69,25 +69,83 @@ async fn ingest_one(store: &Store, path: &Path) -> Result<()> {
         .and_then(|e| e.to_str())
         .map(|s| s.to_ascii_lowercase())
         .unwrap_or_default();
-    let data = match ext.as_str() {
-        "mzml" => read_mzml(path).context("read mzml")?,
+    match ext.as_str() {
+        "mzml" => ingest_mzml_streaming(store, path).await,
         #[cfg(feature = "thermo")]
         "raw" if path.is_file() => {
-            prolance_ms::thermo::ingest(path).context("read thermo raw")?
+            let data = prolance_ms::thermo::ingest(path).context("read thermo raw")?;
+            ingest_buffered(store, data).await
         }
         #[cfg(feature = "waters")]
         "raw" if path.is_dir() => {
-            prolance_ms::waters::ingest(path).context("read waters raw dir")?
+            let data = prolance_ms::waters::ingest(path).context("read waters raw dir")?;
+            ingest_buffered(store, data).await
         }
         #[cfg(feature = "bruker")]
         "d" if path.is_dir() => {
-            prolance_ms::bruker::ingest(path).context("read bruker .d")?
+            let data = prolance_ms::bruker::ingest(path).context("read bruker .d")?;
+            ingest_buffered(store, data).await
         }
         other => anyhow::bail!(
             "unsupported extension/kind: .{} (build with --features all-vendors to enable vendor adapters)",
             other
         ),
-    };
+    }
+}
+
+const SPECTRUM_CHUNK: usize = 2048;
+
+/// Stream spectra straight from the mzML reader into the store in
+/// `SPECTRUM_CHUNK`-sized batches. Memory usage is bounded by the
+/// source byte buffer plus one chunk of decoded peak arrays, which
+/// keeps multi-GB mzML ingests within reasonable RSS.
+async fn ingest_mzml_streaming(store: &Store, path: &Path) -> Result<()> {
+    let mut ingest = MzmlIngest::open(path).context("open mzml")?;
+    let run_id = ingest.run_id().to_string();
+    let mut buf: Vec<prolance_core::Spectrum> = Vec::with_capacity(SPECTRUM_CHUNK);
+    let mut total = 0u32;
+    let mut ms1 = 0u32;
+    let mut ms2 = 0u32;
+    while let Some(s) = ingest.next_spectrum().context("parse spectrum")? {
+        if s.ms_level == 1 {
+            ms1 += 1;
+        } else if s.ms_level >= 2 {
+            ms2 += 1;
+        }
+        total += 1;
+        buf.push(s);
+        if buf.len() >= SPECTRUM_CHUNK {
+            store.append_spectra(&buf).await?;
+            buf.clear();
+        }
+    }
+    if !buf.is_empty() {
+        store.append_spectra(&buf).await?;
+        buf.clear();
+    }
+    let chromatograms = ingest.read_chromatograms().context("parse chromatograms")?;
+    let run = ingest
+        .finalize_run(total, ms1, ms2)
+        .context("finalize run")?;
+    eprintln!(
+        "  parsed {} spectra, {} chromatograms (run_id={})",
+        total,
+        chromatograms.len(),
+        run_id
+    );
+    store.append_run(&run).await?;
+    if !chromatograms.is_empty() {
+        store.append_chromatograms(&chromatograms).await?;
+    }
+    Ok(())
+}
+
+/// Buffered ingest path for vendor adapters that return a complete
+/// [`MzmlData`] (`thermo`, `bruker`, `waters`). Vendor sources are
+/// converted to mzML in-memory so the working set is already bounded
+/// by the converter's own buffering.
+#[cfg(any(feature = "thermo", feature = "bruker", feature = "waters"))]
+async fn ingest_buffered(store: &Store, data: prolance_ms::mzml::MzmlData) -> Result<()> {
     eprintln!(
         "  parsed {} spectra, {} chromatograms (run_id={})",
         data.spectra.len(),
@@ -95,7 +153,7 @@ async fn ingest_one(store: &Store, path: &Path) -> Result<()> {
         data.run.run_id
     );
     store.append_run(&data.run).await?;
-    for chunk in data.spectra.chunks(2048) {
+    for chunk in data.spectra.chunks(SPECTRUM_CHUNK) {
         store.append_spectra(chunk).await?;
     }
     if !data.chromatograms.is_empty() {

@@ -127,3 +127,41 @@ fn roundtrip_real_thermo_mzml_if_present() {
         }
     }
 }
+
+#[test]
+fn streaming_ingest_matches_parse_bytes() {
+    use prolance_ms::mzml::MzmlIngest;
+
+    let mut ingest =
+        MzmlIngest::open_bytes(TINY_MZML.as_bytes().to_vec(), "tiny-stream.mzML".into()).unwrap();
+    let mut streamed = Vec::new();
+    let mut ms1 = 0u32;
+    let mut ms2 = 0u32;
+    while let Some(s) = ingest.next_spectrum().unwrap() {
+        if s.ms_level == 1 {
+            ms1 += 1;
+        } else if s.ms_level >= 2 {
+            ms2 += 1;
+        }
+        streamed.push(s);
+    }
+    let chroms = ingest.read_chromatograms().unwrap();
+    let run = ingest
+        .finalize_run(streamed.len() as u32, ms1, ms2)
+        .unwrap();
+
+    let buffered = parse_bytes(TINY_MZML.as_bytes(), "tiny-stream.mzML".into()).unwrap();
+
+    assert_eq!(streamed.len(), buffered.spectra.len());
+    assert_eq!(chroms.len(), buffered.chromatograms.len());
+    assert_eq!(run.spectrum_count, buffered.run.spectrum_count);
+    assert_eq!(run.ms1_count, buffered.run.ms1_count);
+    assert_eq!(run.ms2_count, buffered.run.ms2_count);
+    assert_eq!(run.run_id, buffered.run.run_id);
+    for (a, b) in streamed.iter().zip(buffered.spectra.iter()) {
+        assert_eq!(a.ms_level, b.ms_level);
+        assert_eq!(a.mz, b.mz);
+        assert_eq!(a.intensity, b.intensity);
+        assert_eq!(a.rt, b.rt);
+    }
+}
