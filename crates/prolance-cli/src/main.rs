@@ -70,7 +70,13 @@ async fn ingest_one(store: &Store, path: &Path) -> Result<()> {
         "raw" if path.is_file() => {
             prolance_ms::thermo::ingest(path).context("read thermo raw")?
         }
-        other => anyhow::bail!("unsupported extension: .{}", other),
+        "raw" if path.is_dir() => {
+            prolance_ms::waters::ingest(path).context("read waters raw dir")?
+        }
+        "d" if path.is_dir() => {
+            prolance_ms::bruker::ingest(path).context("read bruker .d")?
+        }
+        other => anyhow::bail!("unsupported extension/kind: .{}", other),
     };
     eprintln!(
         "  parsed {} spectra, {} chromatograms (run_id={})",
