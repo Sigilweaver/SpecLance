@@ -3,6 +3,7 @@ members = [
     "crates/prolance-core",
     "crates/prolance-ms",
     "crates/prolance-cli",
+    "crates/prolance-py",
 ]
 resolver = "2"
 

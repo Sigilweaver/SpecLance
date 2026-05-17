@@ -41,13 +41,12 @@ async fn query_window_filters_by_rt_and_ms_level() {
     assert!(all_specs.iter().all(|s| s.run_id == run_id));
 
     // RT window [50, 100] -> scans 5..=10, that's 6 spectra.
-    let win = store
-        .query_window(run_id, 50.0, 100.0, None)
-        .await
-        .unwrap();
+    let win = store.query_window(run_id, 50.0, 100.0, None).await.unwrap();
     let win_specs = batches_to_spectra(&win);
     assert_eq!(win_specs.len(), 6);
-    assert!(win_specs.iter().all(|s| s.rt.unwrap() >= 50.0 && s.rt.unwrap() <= 100.0));
+    assert!(win_specs
+        .iter()
+        .all(|s| s.rt.unwrap() >= 50.0 && s.rt.unwrap() <= 100.0));
 
     // MS1 only across full range -> 10 spectra.
     let ms1 = store
@@ -59,7 +58,10 @@ async fn query_window_filters_by_rt_and_ms_level() {
     assert!(ms1_specs.iter().all(|s| s.ms_level == 1));
 
     // RT window [30, 70] + MS2 -> odd scans 3, 5, 7 -> 3 spectra.
-    let ms2 = store.query_window(run_id, 30.0, 70.0, Some(2)).await.unwrap();
+    let ms2 = store
+        .query_window(run_id, 30.0, 70.0, Some(2))
+        .await
+        .unwrap();
     let ms2_specs = batches_to_spectra(&ms2);
     assert_eq!(ms2_specs.len(), 3);
     assert!(ms2_specs
@@ -92,5 +94,7 @@ async fn create_default_indexes_is_idempotent() {
         .await
         .unwrap();
     let specs = batches_to_spectra(&hits);
-    assert!(specs.iter().all(|s| s.ms_level == 1 && s.rt.unwrap() >= 5.0 && s.rt.unwrap() <= 10.0));
+    assert!(specs
+        .iter()
+        .all(|s| s.ms_level == 1 && s.rt.unwrap() >= 5.0 && s.rt.unwrap() <= 10.0));
 }
