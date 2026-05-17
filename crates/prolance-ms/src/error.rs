@@ -43,3 +43,9 @@ impl From<base64::DecodeError> for MsError {
         MsError::Base64(e.to_string())
     }
 }
+
+impl From<serde_json::Error> for MsError {
+    fn from(e: serde_json::Error) -> Self {
+        MsError::Other(e.to_string())
+    }
+}

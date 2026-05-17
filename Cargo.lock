@@ -3816,6 +3816,8 @@ dependencies = [
  "arrow-schema",
  "base64",
  "chrono",
+ "flate2",
+ "memchr",
  "opentfraw",
  "opentimstdf",
  "openwraw",
@@ -3823,6 +3825,7 @@ dependencies = [
  "quick-xml",
  "serde",
  "serde_json",
+ "sha1",
  "sha2",
  "tempfile",
  "thiserror",
@@ -4552,6 +4555,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "sha1"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.2.17",
+ "digest",
 ]
 
 [[package]]
