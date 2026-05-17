@@ -1,0 +1,23 @@
+[package]
+name        = "prolance-cli"
+description = "Command-line interface for ProLance"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+homepage.workspace     = true
+
+[[bin]]
+name = "prolance"
+path = "src/main.rs"
+
+[dependencies]
+prolance-core = { workspace = true }
+prolance-ms   = { workspace = true, features = ["all-vendors"] }
+clap          = { workspace = true }
+tokio         = { workspace = true }
+anyhow        = { workspace = true }
+indicatif     = { workspace = true }
+serde_json    = { workspace = true }
