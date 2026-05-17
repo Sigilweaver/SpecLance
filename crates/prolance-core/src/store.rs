@@ -17,6 +17,10 @@ use arrow_array::{
 };
 use futures::TryStreamExt;
 use lancedb::{
+    index::{
+        scalar::{BTreeIndexBuilder, BitmapIndexBuilder},
+        Index,
+    },
     query::{ExecutableQuery, QueryBase},
     Connection, Table,
 };
@@ -120,6 +124,72 @@ impl Store {
         let stream = table.query().only_if(filter).execute().await?;
         let batches: Vec<RecordBatch> = stream.try_collect().await?;
         Ok(batches)
+    }
+
+    /// Range-query spectra within a retention-time window for a run,
+    /// optionally constrained to a single MS level.
+    ///
+    /// `rt_min` and `rt_max` are inclusive (seconds, matching the
+    /// `rt` column). Pass `f64::NEG_INFINITY` / `f64::INFINITY` to
+    /// leave a bound open.
+    pub async fn query_window(
+        &self,
+        run_id: &str,
+        rt_min: f64,
+        rt_max: f64,
+        ms_level: Option<u8>,
+    ) -> Result<Vec<RecordBatch>> {
+        let table = self.spectra_table().await?;
+        let mut clauses = vec![format!("run_id = '{}'", run_id.replace('\'', "''"))];
+        if rt_min.is_finite() {
+            clauses.push(format!("rt >= {}", rt_min));
+        }
+        if rt_max.is_finite() {
+            clauses.push(format!("rt <= {}", rt_max));
+        }
+        if let Some(lvl) = ms_level {
+            clauses.push(format!("ms_level = {}", lvl));
+        }
+        let filter = clauses.join(" AND ");
+        let stream = table.query().only_if(filter).execute().await?;
+        let batches: Vec<RecordBatch> = stream.try_collect().await?;
+        Ok(batches)
+    }
+
+    /// Create the default scalar indexes on the spectra and runs
+    /// tables. Safe to call repeatedly: existing indexes are
+    /// replaced by `lancedb`.
+    ///
+    /// - `spectra.run_id`   -> BTree (group-by-run lookups)
+    /// - `spectra.scan_num` -> BTree (ordered scan range)
+    /// - `spectra.rt`       -> BTree (retention-time range)
+    /// - `spectra.ms_level` -> Bitmap (low cardinality: 1, 2, ...)
+    /// - `runs.run_id`      -> BTree (single-row lookup)
+    pub async fn create_default_indexes(&self) -> Result<()> {
+        let spectra = self.spectra_table().await?;
+        spectra
+            .create_index(&["run_id"], Index::BTree(BTreeIndexBuilder::default()))
+            .execute()
+            .await?;
+        spectra
+            .create_index(&["scan_num"], Index::BTree(BTreeIndexBuilder::default()))
+            .execute()
+            .await?;
+        spectra
+            .create_index(&["rt"], Index::BTree(BTreeIndexBuilder::default()))
+            .execute()
+            .await?;
+        spectra
+            .create_index(&["ms_level"], Index::Bitmap(BitmapIndexBuilder::default()))
+            .execute()
+            .await?;
+
+        let runs = self.runs_table().await?;
+        runs.create_index(&["run_id"], Index::BTree(BTreeIndexBuilder::default()))
+            .execute()
+            .await?;
+
+        Ok(())
     }
 }
 
