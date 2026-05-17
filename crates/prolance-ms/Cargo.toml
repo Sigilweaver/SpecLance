@@ -1,0 +1,40 @@
+[package]
+name        = "prolance-ms"
+description = "Ingest adapters and mzML reader/writer for ProLance"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+homepage.workspace     = true
+
+[features]
+default = []
+# Each vendor reader gates an adapter. Default-off so tests can run without
+# every reader compiling.
+thermo  = ["dep:opentfraw"]
+bruker  = ["dep:opentimstdf"]
+waters  = ["dep:openwraw"]
+all-vendors = ["thermo", "bruker", "waters"]
+
+[dependencies]
+prolance-core = { workspace = true }
+arrow-array   = { workspace = true }
+arrow-schema  = { workspace = true }
+anyhow        = { workspace = true }
+thiserror     = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+quick-xml     = { workspace = true }
+base64        = { workspace = true }
+chrono        = { workspace = true }
+sha2          = { workspace = true }
+
+opentfraw     = { workspace = true, optional = true }
+opentimstdf   = { workspace = true, optional = true }
+openwraw      = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio   = { workspace = true }
+tempfile = "3"
