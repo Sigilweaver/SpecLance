@@ -11,12 +11,14 @@ homepage.workspace     = true
 
 [features]
 default = []
-# Each vendor reader gates an adapter. Default-off so tests can run without
-# every reader compiling.
-thermo  = ["dep:opentfraw"]
-bruker  = ["dep:opentimstdf"]
-waters  = ["dep:openwraw"]
-all-vendors = ["thermo", "bruker", "waters"]
+# Vendor ingest goes through openproteo-io with all three vendors enabled.
+# `thermo`, `bruker`, `waters` are kept as aliases so callers can keep their
+# existing feature flags; they all turn on the same code path.
+vendors     = ["dep:openproteo-io"]
+thermo      = ["vendors"]
+bruker      = ["vendors"]
+waters      = ["vendors"]
+all-vendors = ["vendors"]
 
 [dependencies]
 prolance-core = { workspace = true }
@@ -34,9 +36,7 @@ chrono        = { workspace = true }
 sha2          = { workspace = true }
 sha1          = { workspace = true }
 
-opentfraw     = { workspace = true, optional = true }
-opentimstdf   = { workspace = true, optional = true }
-openwraw      = { workspace = true, optional = true }
+openproteo-io = { workspace = true, optional = true, features = ["all"] }
 
 [dev-dependencies]
 tokio   = { workspace = true }

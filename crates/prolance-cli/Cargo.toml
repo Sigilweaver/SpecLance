@@ -15,10 +15,11 @@ path = "src/main.rs"
 
 [features]
 default = []
-thermo  = ["prolance-ms/thermo"]
-bruker  = ["prolance-ms/bruker"]
-waters  = ["prolance-ms/waters"]
-all-vendors = ["thermo", "bruker", "waters"]
+vendors     = ["prolance-ms/vendors"]
+thermo      = ["vendors"]
+bruker      = ["vendors"]
+waters      = ["vendors"]
+all-vendors = ["vendors"]
 
 [dependencies]
 prolance-core = { workspace = true }

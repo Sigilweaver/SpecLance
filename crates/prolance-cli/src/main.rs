@@ -107,19 +107,9 @@ async fn ingest_one(store: &Store, path: &Path) -> Result<()> {
         .unwrap_or_default();
     match ext.as_str() {
         "mzml" => ingest_mzml_streaming(store, path).await,
-        #[cfg(feature = "thermo")]
-        "raw" if path.is_file() => {
-            let data = prolance_ms::thermo::ingest(path).context("read thermo raw")?;
-            ingest_buffered(store, data).await
-        }
-        #[cfg(feature = "waters")]
-        "raw" if path.is_dir() => {
-            let data = prolance_ms::waters::ingest(path).context("read waters raw dir")?;
-            ingest_buffered(store, data).await
-        }
-        #[cfg(feature = "bruker")]
-        "d" if path.is_dir() => {
-            let data = prolance_ms::bruker::ingest(path).context("read bruker .d")?;
+        #[cfg(feature = "vendors")]
+        _ if path.is_file() || path.is_dir() => {
+            let data = prolance_ms::vendor::ingest(path).context("read vendor bundle")?;
             ingest_buffered(store, data).await
         }
         other => anyhow::bail!(
@@ -180,7 +170,7 @@ async fn ingest_mzml_streaming(store: &Store, path: &Path) -> Result<()> {
 /// [`MzmlData`] (`thermo`, `bruker`, `waters`). Vendor sources are
 /// converted to mzML in-memory so the working set is already bounded
 /// by the converter's own buffering.
-#[cfg(any(feature = "thermo", feature = "bruker", feature = "waters"))]
+#[cfg(feature = "vendors")]
 async fn ingest_buffered(store: &Store, data: prolance_ms::mzml::MzmlData) -> Result<()> {
     eprintln!(
         "  parsed {} spectra, {} chromatograms (run_id={})",

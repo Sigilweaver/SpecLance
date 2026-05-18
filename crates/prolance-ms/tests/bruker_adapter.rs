@@ -1,8 +1,8 @@
-//! Bruker timsTOF `.d/` -> MzmlData via direct opentimstdf ingest.
+//! Bruker timsTOF `.d/` -> MzmlData via the unified vendor ingest.
 
-#![cfg(feature = "bruker")]
+#![cfg(feature = "vendors")]
 
-use prolance_ms::bruker;
+use prolance_ms::vendor;
 
 #[test]
 fn bruker_ingest_smoke() {
@@ -24,7 +24,7 @@ fn bruker_ingest_smoke() {
         return;
     };
 
-    let data = bruker::ingest(path).expect("bruker ingest");
+    let data = vendor::ingest(path).expect("bruker ingest");
     assert!(!data.spectra.is_empty(), "expected at least one spectrum");
     assert_eq!(data.run.source_format, "bruker-tdf");
     assert!(!data.run.run_id.is_empty());

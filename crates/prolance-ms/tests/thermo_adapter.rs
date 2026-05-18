@@ -1,8 +1,8 @@
-//! Thermo .raw -> MzmlData via direct opentfraw ingest (no mzML round trip).
+//! Thermo .raw -> MzmlData via the unified vendor ingest (no mzML round trip).
 
-#![cfg(feature = "thermo")]
+#![cfg(feature = "vendors")]
 
-use prolance_ms::thermo;
+use prolance_ms::vendor;
 
 #[test]
 fn thermo_ingest_small_raw() {
@@ -11,7 +11,7 @@ fn thermo_ingest_small_raw() {
         eprintln!("skip: {path} not present");
         return;
     }
-    let data = thermo::ingest(path).expect("thermo ingest");
+    let data = vendor::ingest(path).expect("thermo ingest");
     assert!(!data.spectra.is_empty(), "expected at least one spectrum");
     assert!(!data.run.run_id.is_empty());
     assert_eq!(data.run.source_format, "thermo-raw");

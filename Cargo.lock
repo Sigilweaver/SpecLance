@@ -3565,6 +3565,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "269bca4c2591a28585d6bf10d9ed0332b7d76900a1b02bec41bdc3a2cdcda107"
 
 [[package]]
+name = "openproteo-core"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "openproteo-io"
+version = "0.1.0"
+dependencies = [
+ "openproteo-core",
+ "opentfraw",
+ "opentimstdf",
+ "openwraw",
+]
+
+[[package]]
 name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3574,6 +3591,7 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 name = "opentfraw"
 version = "1.0.4"
 dependencies = [
+ "openproteo-core",
  "thiserror",
 ]
 
@@ -3581,6 +3599,7 @@ dependencies = [
 name = "opentimstdf"
 version = "1.0.4"
 dependencies = [
+ "openproteo-core",
  "rusqlite",
  "thiserror",
  "zstd",
@@ -3589,6 +3608,10 @@ dependencies = [
 [[package]]
 name = "openwraw"
 version = "1.0.3"
+dependencies = [
+ "openproteo-core",
+ "thiserror",
+]
 
 [[package]]
 name = "option-ext"
@@ -3839,9 +3862,7 @@ dependencies = [
  "chrono",
  "flate2",
  "memchr",
- "opentfraw",
- "opentimstdf",
- "openwraw",
+ "openproteo-io",
  "prolance-core",
  "quick-xml",
  "serde",
