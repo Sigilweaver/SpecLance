@@ -3579,6 +3579,7 @@ dependencies = [
  "opentfraw",
  "opentimstdf",
  "openwraw",
+ "thiserror",
 ]
 
 [[package]]

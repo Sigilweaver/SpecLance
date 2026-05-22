@@ -29,11 +29,11 @@ jobs:
           repository: Sigilweaver/OpenTFRaw
           path: OpenTFRaw
 
-      - name: Checkout OpenTDF
+      - name: Checkout OpenTimsTDF
         uses: actions/checkout@v4
         with:
           repository: Sigilweaver/OpenTimsTDF
-          path: OpenTDF
+          path: OpenTimsTDF
 
       - name: Checkout OpenWRaw
         uses: actions/checkout@v4
@@ -93,11 +93,11 @@ jobs:
           repository: Sigilweaver/OpenTFRaw
           path: OpenTFRaw
 
-      - name: Checkout OpenTDF
+      - name: Checkout OpenTimsTDF
         uses: actions/checkout@v4
         with:
           repository: Sigilweaver/OpenTimsTDF
-          path: OpenTDF
+          path: OpenTimsTDF
 
       - name: Checkout OpenWRaw
         uses: actions/checkout@v4

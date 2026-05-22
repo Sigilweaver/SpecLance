@@ -45,7 +45,7 @@ memchr = "2"
 # these directly; everything goes through `openproteo-io`. They are kept as
 # workspace deps so that openproteo-io's path resolution stays valid.
 opentfraw = { path = "../OpenTFRaw/crates/opentfraw" }
-opentimstdf = { path = "../OpenTDF/crates/opentimstdf" }
+opentimstdf = { path = "../OpenTimsTDF/crates/opentimstdf" }
 openwraw = { path = "../OpenWRaw/crates/openwraw" }
 openproteo-io = { path = "../OpenProteo/crates/openproteo-io" }
 

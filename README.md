@@ -5,7 +5,7 @@
 > storage layer; vendor readers
 > [OpenWRaw](https://github.com/Sigilweaver/OpenWRaw),
 > [OpenTFRaw](https://github.com/Sigilweaver/OpenTFRaw), and
-> [OpenTimsTDF](https://github.com/Sigilweaver/OpenTDF) feed it
+> [OpenTimsTDF](https://github.com/Sigilweaver/OpenTimsTDF) feed it
 > through [openproteo-io](https://github.com/Sigilweaver/OpenProteo).
 
 A fast, columnar, memory-mapped mass spectrometry data store powered by [Lance].
@@ -34,7 +34,7 @@ into existing libraries without rewriting any analysis code.
 There are three usage modes:
 
 1. **Ingest from vendor format.** Use the open reader crates (OpenTFRaw,
-   OpenTDF, OpenWRaw) to parse proprietary binary files and write a ProLance
+   OpenTimsTDF, OpenWRaw) to parse proprietary binary files and write a ProLance
    store. No vendor SDK, no Wine, no COM interop.
 2. **Ingest from mzML.** Parse existing mzML files and write a ProLance
    store. This is the zero-friction on-ramp for labs that already have mzML
@@ -76,7 +76,7 @@ prolance-core/     Arrow schema definitions, LanceDB table management,
 prolance-ms/       Ingest adapters.
                      - mzML reader (noodles or quick-xml + mzml CV table)
                      - OpenTFRaw adapter (Thermo .raw)
-                     - OpenTDF adapter (Bruker timsTOF .d)
+                     - OpenTimsTDF adapter (Bruker timsTOF .d)
                      - OpenWRaw adapter (Waters MassLynx .raw)
                    Each adapter normalises its source into the common
                    prolance_core::Spectrum type.
@@ -330,7 +330,7 @@ prolance-core
 prolance-ms
   prolance-core
   opentfraw   (Thermo .raw)
-  opentdf     (Bruker timsTOF .d)
+  OpenTimsTDF     (Bruker timsTOF .d)
   openwraw    (Waters .raw)
   quick-xml   (mzML ingest)
   base64      (binary array decoding)
@@ -352,7 +352,7 @@ any kind.
 | project    | role                                              |
 |------------|---------------------------------------------------|
 | OpenTFRaw  | Thermo .raw parser; ingest adapter source         |
-| OpenTDF    | Bruker timsTOF parser; ingest adapter source      |
+| OpenTimsTDF    | Bruker timsTOF parser; ingest adapter source      |
 | OpenWRaw   | Waters MassLynx parser; ingest adapter source     |
 | BioLance   | Conceptual template (VCF -> Lance); sibling project|
 | ProLance   | Storage layer; delegates parsing to the above     |

@@ -102,9 +102,13 @@ fn spectrum_to_record(idx: usize, s: &Spectrum) -> SpectrumRecord {
         Some(-1) => Some(Polarity::Negative),
         _ => None,
     };
-    let scan_mode = s
-        .centroided
-        .map(|c| if c { ScanMode::Centroid } else { ScanMode::Profile });
+    let scan_mode = s.centroided.map(|c| {
+        if c {
+            ScanMode::Centroid
+        } else {
+            ScanMode::Profile
+        }
+    });
 
     let native_id = s
         .native_id

@@ -11,10 +11,10 @@ fn bruker_ingest_smoke() {
     // frames - it exercises the MS1 pooling path and the per-PASEF-row MS2
     // emission path.
     let candidates = [
-        // OpenTDF's own validation corpus is the most reliable source of well-
+        // OpenTimsTDF's own validation corpus is the most reliable source of well-
         // formed `.d/` bundles. We pick the smallest available (~106 MB).
-        "/workspaces/Projects/OpenTDF/re/artifacts/cache/pride/PXD036417/NQO1-F107C_coi-N2-P_200-0C_3996.d",
-        "/workspaces/Projects/OpenTDF/re/artifacts/cache/pride/PXD031833/mTTYH1-D_coi-N2-P-200-20C_U-T_3366.d",
+        "/workspaces/Projects/OpenTimsTDF/re/artifacts/cache/pride/PXD036417/NQO1-F107C_coi-N2-P_200-0C_3996.d",
+        "/workspaces/Projects/OpenTimsTDF/re/artifacts/cache/pride/PXD031833/mTTYH1-D_coi-N2-P-200-20C_U-T_3366.d",
     ];
     let Some(path) = candidates
         .iter()
