@@ -23,4 +23,4 @@ tokio         = { workspace = true }
 futures       = { workspace = true }
 lancedb       = { workspace = true }
 anyhow        = { workspace = true }
-pyo3          = { version = "0.22", features = ["extension-module"] }
+pyo3          = { version = "0.22", features = ["extension-module", "abi3-py39"] }

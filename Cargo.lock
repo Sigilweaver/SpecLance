@@ -3576,6 +3576,8 @@ dependencies = [
 [[package]]
 name = "openproteo-io"
 version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbb48590690ecb5dd849c93606b3ee3d3ad5a35e3d44abe01c1e15dce7c8edc1"
 dependencies = [
  "openproteo-core",
  "opentfraw",

@@ -66,8 +66,6 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64
-          - os: ubuntu-latest
-            target: aarch64
           - os: macos-latest
             target: x86_64
           - os: macos-latest
@@ -87,7 +85,9 @@ jobs:
       - uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist --find-interpreter --manifest-path crates/prolance-py/Cargo.toml
+          # abi3-py39 in prolance-py means one wheel covers Python 3.9+,
+          # so we only need to build with a single interpreter.
+          args: --release --out dist -i python3.11 --manifest-path crates/prolance-py/Cargo.toml
           sccache: "true"
           manylinux: auto
           # The manylinux container does not inherit host tools, so install
