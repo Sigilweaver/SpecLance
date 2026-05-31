@@ -9,6 +9,9 @@ authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "prolance"
 path = "src/main.rs"

@@ -9,6 +9,9 @@ authors.workspace      = true
 repository.workspace   = true
 homepage.workspace     = true
 
+[lints]
+workspace = true
+
 [lib]
 name = "_prolance"
 crate-type = ["cdylib"]

@@ -9,6 +9,9 @@ authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[lints]
+workspace = true
+
 [features]
 default = []
 # openproteo-io is always linked (the canonical mzML writer lives there).

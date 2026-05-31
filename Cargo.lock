@@ -3575,7 +3575,7 @@ dependencies = [
 
 [[package]]
 name = "openproteo-io"
-version = "1.0.4-dev"
+version = "1.1.0"
 dependencies = [
  "openproteo-core",
  "opentfraw",
@@ -3827,7 +3827,7 @@ dependencies = [
 
 [[package]]
 name = "prolance-cli"
-version = "0.1.0"
+version = "0.2.0-alpha"
 dependencies = [
  "anyhow",
  "clap",
@@ -3843,7 +3843,7 @@ dependencies = [
 
 [[package]]
 name = "prolance-core"
-version = "0.1.0"
+version = "0.2.0-alpha"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -3862,7 +3862,7 @@ dependencies = [
 
 [[package]]
 name = "prolance-ms"
-version = "0.1.0"
+version = "0.2.0-alpha"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -3885,7 +3885,7 @@ dependencies = [
 
 [[package]]
 name = "prolance-py"
-version = "0.1.0"
+version = "0.2.0-alpha"
 dependencies = [
  "anyhow",
  "futures",

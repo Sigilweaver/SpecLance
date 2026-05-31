@@ -9,6 +9,9 @@ authors.workspace      = true
 repository.workspace   = true
 homepage.workspace     = true
 
+[lints]
+workspace = true
+
 [dependencies]
 lancedb       = { workspace = true }
 arrow-array   = { workspace = true }
