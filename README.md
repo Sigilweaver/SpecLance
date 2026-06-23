@@ -23,16 +23,25 @@ into existing libraries without rewriting any analysis code.
 
 ## Vision
 
-```
-                       ingest
-   .raw (Thermo)  ─────────────┐
-   .d/  (Bruker)  ─────────────┤
-   .raw (Waters)  ─────────────┼──►  ProLance store  ──►  analysis libraries
-   .mzML          ─────────────┘         │               (spectrum_utils,
-                                         │                matchms, pyOpenMS,
-                                    export │                ms2ml, ...)
-                                         ▼
-                                    .mzML (roundtrip)
+```mermaid
+flowchart LR
+    thermo[".raw (Thermo)"]
+    bruker[".d/ (Bruker)"]
+    waters[".raw (Waters)"]
+    mzml_in[".mzML"]
+
+    store["ProLance store"]
+
+    libs["analysis libraries\nspectrum_utils · matchms\npyOpenMS · ms2ml"]
+    mzml_out[".mzML (roundtrip)"]
+
+    thermo -- ingest --> store
+    bruker -- ingest --> store
+    waters -- ingest --> store
+    mzml_in -- ingest --> store
+
+    store --> libs
+    store -- export --> mzml_out
 ```
 
 There are three usage modes:
