@@ -8,24 +8,24 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.2.0-alpha] - 2026-05-31
 
-First public alpha. ProLance moves from `develop` to `main` as the
+First public alpha. SpecLance moves from `develop` to `main` as the
 default branch and the workspace is ready for publication on crates.io
 and PyPI.
 
 ### Added
 
-- `prolance-core` crate: Lance-backed `Store` with per-run dataset
+- `speclance-core` crate: Lance-backed `Store` with per-run dataset
   layout, `RunMetadata` / `SpectrumRecord` types, scalar indexes on
   retention time and m/z, and a range-query API.
-- `prolance-ms` crate: streaming `MzmlIngest` cursor, mzML 1.1.0
+- `speclance-ms` crate: streaming `MzmlIngest` cursor, mzML 1.1.0
   reader/writer with full roundtrip support, and a `vendors` feature
   family (`thermo`, `bruker`, `waters`, `all-vendors`) that turns on
   the matching `openproteo-io` feature set.
-- `prolance-cli` crate: ingestion dispatch by file extension
+- `speclance-cli` crate: ingestion dispatch by file extension
   (`.raw` file -> Thermo, `.raw/` dir -> Waters, `.d/` dir -> Bruker,
-  `.mzML` -> mzML), Lance store management, and `prolance export` to
+  `.mzML` -> mzML), Lance store management, and `speclance export` to
   emit mzML back out of a store.
-- `prolance-py` crate: PyO3 bindings (`_prolance`) exposing `Store`,
+- `speclance-py` crate: PyO3 bindings (`_speclance`) exposing `Store`,
   ingest, indexing, and range-query against PyArrow / Polars / Pandas.
 - CI: cross-platform (ubuntu / macos / windows) Rust workflow plus a
   dedicated Python wheel job.
@@ -37,11 +37,11 @@ and PyPI.
 
 - All vendor ingest now routes through `openproteo-io` rather than
   calling vendor readers (`opentfraw`, `opentimstdf`, `openwraw`)
-  directly. ProLance no longer maintains per-vendor adapter code -
+  directly. SpecLance no longer maintains per-vendor adapter code -
   vendor coverage tracks the OpenProteo stack one-for-one.
 - mzML emission delegated to `openproteo-core`'s streaming writer
   (indexed output, SHA-1 footer).
-- Workspace manifest: `homepage = "https://sigilweaver.app/prolance/"`,
+- Workspace manifest: `homepage = "https://sigilweaver.app/speclance/"`,
   `keywords` and `categories` added for crates.io discoverability
   (WP13).
 - README badge block unified with the rest of the Sigilweaver

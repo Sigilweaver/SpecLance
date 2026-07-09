@@ -1,11 +1,11 @@
-# Contributing to ProLance
+# Contributing to SpecLance
 
-Thanks for your interest in ProLance. This is a small, single-maintainer
+Thanks for your interest in SpecLance. This is a small, single-maintainer
 project that ships [Apache-2.0](LICENSE) Rust (and Python) tooling for
 columnar, memory-mapped mass-spectrometry storage built on Lance.
 
-Crates / packages in this repo: `prolance-core`, `prolance-ms`,
-`prolance-cli`, `prolance-py`.
+Crates / packages in this repo: `speclance-core`, `speclance-ms`,
+`speclance-cli`, `speclance-py`.
 
 ## Before you open a PR
 
@@ -25,7 +25,7 @@ Crates / packages in this repo: `prolance-core`, `prolance-ms`,
 
 ## Vendor ingest
 
-ProLance never talks to vendor formats directly - all vendor reads go
+SpecLance never talks to vendor formats directly - all vendor reads go
 through `openproteo-io` and all mzML emission goes through
 `openproteo-core`. If you need new vendor functionality, contribute it
 upstream in [OpenProteo](https://github.com/Sigilweaver/OpenProteo)

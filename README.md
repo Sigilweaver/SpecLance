@@ -1,11 +1,11 @@
-# ProLance
+# SpecLance
 
-[![CI](https://github.com/Sigilweaver/ProLance/actions/workflows/ci.yml/badge.svg)](https://github.com/Sigilweaver/ProLance/actions/workflows/ci.yml)
+[![CI](https://github.com/Sigilweaver/SpecLance/actions/workflows/ci.yml/badge.svg)](https://github.com/Sigilweaver/SpecLance/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust MSRV](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 
 > Part of the [OpenProteo](https://sigilweaver.app/openproteo/docs/)
-> stack for proteomics raw-file access. ProLance is the columnar
+> stack for mass spectrometry raw-file access. SpecLance is the columnar
 > storage layer; vendor readers
 > [OpenWRaw](https://github.com/Sigilweaver/OpenWRaw),
 > [OpenTFRaw](https://github.com/Sigilweaver/OpenTFRaw), and
@@ -14,10 +14,10 @@
 
 A fast, columnar, memory-mapped mass spectrometry data store powered by [Lance].
 
-ProLance is a **storage format**, not an analysis framework. Its purpose is to
+SpecLance is a **storage format**, not an analysis framework. Its purpose is to
 serve as a drop-in replacement for mzML in existing proteomics workflows - one
 that is faster to read, cheaper to seek, and can hold many runs in a single
-directory. Researchers should be able to swap `run.mzML` for a ProLance store,
+directory. Researchers should be able to swap `run.mzML` for a SpecLance store,
 retrieve spectra using familiar Python or Rust objects, and feed them directly
 into existing libraries without rewriting any analysis code.
 
@@ -30,7 +30,7 @@ flowchart LR
     waters[".raw (Waters)"]
     mzml_in[".mzML"]
 
-    store["ProLance store"]
+    store["SpecLance store"]
 
     libs["analysis libraries\nspectrum_utils · matchms\npyOpenMS · ms2ml"]
     mzml_out[".mzML (roundtrip)"]
@@ -47,15 +47,15 @@ flowchart LR
 There are three usage modes:
 
 1. **Ingest from vendor format.** Use the open reader crates (OpenTFRaw,
-   OpenTimsTDF, OpenWRaw) to parse proprietary binary files and write a ProLance
+   OpenTimsTDF, OpenWRaw) to parse proprietary binary files and write a SpecLance
    store. No vendor SDK, no Wine, no COM interop.
-2. **Ingest from mzML.** Parse existing mzML files and write a ProLance
+2. **Ingest from mzML.** Parse existing mzML files and write a SpecLance
    store. This is the zero-friction on-ramp for labs that already have mzML
    pipelines.
-3. **Export to mzML.** Reconstruct a spec-valid mzML file from a ProLance
-   store. The roundtrip `mzML -> ProLance -> mzML` must yield an effectively
+3. **Export to mzML.** Reconstruct a spec-valid mzML file from a SpecLance
+   store. The roundtrip `mzML -> SpecLance -> mzML` must yield an effectively
    identical file: same spectra, same CV terms, same metadata, same ordering.
-   This invariant is what makes ProLance safe to insert into existing
+   This invariant is what makes SpecLance safe to insert into existing
    pipelines without data loss.
 
 ## Why Not mzML?
@@ -83,26 +83,26 @@ entire mzML file can be answered by reading a fraction of the bytes.
 The workspace will follow the same three-crate pattern as BioLance:
 
 ```
-prolance-core/     Arrow schema definitions, LanceDB table management,
+speclance-core/     Arrow schema definitions, LanceDB table management,
                    shared types (Spectrum, Chromatogram, Run).
 
-prolance-ms/       Ingest adapters.
+speclance-ms/       Ingest adapters.
                      - mzML reader (noodles or quick-xml + mzml CV table)
                      - OpenTFRaw adapter (Thermo .raw)
                      - OpenTimsTDF adapter (Bruker timsTOF .d)
                      - OpenWRaw adapter (Waters MassLynx .raw)
                    Each adapter normalises its source into the common
-                   prolance_core::Spectrum type.
+                   speclance_core::Spectrum type.
 
-prolance-cli/      `prolance` binary.
-                     ingest   - write a ProLance store from any source
+speclance-cli/      `speclance` binary.
+                     ingest   - write a SpecLance store from any source
                      query    - filter spectra by RT / MS level / precursor
                      xic      - extracted ion chromatogram across runs
                      compare  - cross-run TIC / XIC overlays
-                     export   - reconstruct mzML from a ProLance store
+                     export   - reconstruct mzML from a SpecLance store
 ```
 
-A Python package (`prolance-py`, built with PyO3 + maturin) will expose the
+A Python package (`speclance-py`, built with PyO3 + maturin) will expose the
 store via a thin API that returns objects compatible with common analysis
 libraries.
 
@@ -202,7 +202,7 @@ export.
 
 mzML binary arrays can be stored as 32-bit or 64-bit IEEE 754 floats, and
 some files use MS-Numpress lossless or lossy integer encodings. Internally,
-ProLance stores all m/z values as Float64 (sufficient for any precision),
+SpecLance stores all m/z values as Float64 (sufficient for any precision),
 but the `mz_precision` and `intensity_precision` columns record the original
 bit width. On export, values are downcast to the original width before
 Base64-encoding, preserving the roundtrip value to within the original
@@ -233,7 +233,7 @@ is inconsistent. There are two representation options:
   tuple uniquely identifies each record. This preserves the full 4D dataset
   at the cost of row count.
 
-ProLance should support both modes as an ingest flag (`--tims-mode
+SpecLance should support both modes as an ingest flag (`--tims-mode
 collapsed|expanded`). The mzML exporter will use the expanded-mode
 representation when exporting TIMS data.
 
@@ -256,7 +256,7 @@ data (centroiding, deisotoping, denoising, calibration) in a
 (e.g., whether to apply their own centroiding) and must be preserved.
 
 The `run_metadata` JSON column stores the full `<dataProcessingList>` XML
-fragment. The exporter writes it back verbatim. If ProLance itself transforms
+fragment. The exporter writes it back verbatim. If SpecLance itself transforms
 data during ingest (e.g., vendor-to-mzML conversion adds a processing step),
 a new `<processingMethod>` entry is appended recording the conversion.
 
@@ -280,12 +280,12 @@ The primary consumer surface is Python. The most widely-used spectrum
 libraries - `spectrum_utils`, `matchms`, `ms2ml`, `pyOpenMS`, `pyteomics` -
 each define their own spectrum object. None of them read Lance natively.
 
-The `prolance-py` Python package will expose:
+The `speclance-py` Python package will expose:
 
 ```python
-import prolance
+import speclance
 
-store = prolance.open("runs/")
+store = speclance.open("runs/")
 
 # Iterator of spectrum_utils.spectrum.MsmsSpectrum objects
 for spec in store.ms2_spectra(run="run01", rt_min=10.0, rt_max=20.0):
@@ -316,8 +316,8 @@ bar, matching the BioLance pattern.
 
 ### 9. Roundtrip correctness as a first-class invariant
 
-The mzML -> ProLance -> mzML roundtrip is not an afterthought - it is the
-primary correctness guarantee that makes ProLance safe to deploy as an
+The mzML -> SpecLance -> mzML roundtrip is not an afterthought - it is the
+primary correctness guarantee that makes SpecLance safe to deploy as an
 infrastructure swap. It should be tested with a suite of real mzML files
 spanning:
 
@@ -337,23 +337,23 @@ precision of the original storage width.
 ## Dependency Map
 
 ```
-prolance-core
+speclance-core
   lancedb, arrow-array, arrow-schema, serde_json, anyhow, thiserror
 
-prolance-ms
-  prolance-core
+speclance-ms
+  speclance-core
   opentfraw   (Thermo .raw)
   OpenTimsTDF     (Bruker timsTOF .d)
   openwraw    (Waters .raw)
   quick-xml   (mzML ingest)
   base64      (binary array decoding)
 
-prolance-cli
-  prolance-core, prolance-ms
+speclance-cli
+  speclance-core, speclance-ms
   clap, tokio, rayon, indicatif
 
-prolance-py  (separate maturin crate)
-  prolance-core, prolance-ms
+speclance-py  (separate maturin crate)
+  speclance-core, speclance-ms
   pyo3, numpy
 ```
 
@@ -368,6 +368,6 @@ any kind.
 | OpenTimsTDF    | Bruker timsTOF parser; ingest adapter source      |
 | OpenWRaw   | Waters MassLynx parser; ingest adapter source     |
 | BioLance   | Conceptual template (VCF -> Lance); sibling project|
-| ProLance   | Storage layer; delegates parsing to the above     |
+| SpecLance   | Storage layer; delegates parsing to the above     |
 
 [Lance]: https://lancedb.github.io/lance/

@@ -1,0 +1,39 @@
+[package]
+name = "speclance-cli"
+description = "Command-line interface for SpecLance"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "speclance"
+path = "src/main.rs"
+
+[features]
+default = []
+vendors = ["speclance-ms/vendors"]
+thermo = ["vendors"]
+bruker = ["vendors"]
+waters = ["vendors"]
+all-vendors = ["vendors"]
+
+[dependencies]
+speclance-core = { workspace = true }
+speclance-ms = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+indicatif = { workspace = true }
+serde_json = { workspace = true }
+futures = { workspace = true }
+lancedb = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

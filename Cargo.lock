@@ -3828,77 +3828,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prolance-cli"
-version = "0.2.0-alpha"
-dependencies = [
- "anyhow",
- "clap",
- "futures",
- "indicatif",
- "lancedb",
- "prolance-core",
- "prolance-ms",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "prolance-core"
-version = "0.2.0-alpha"
-dependencies = [
- "anyhow",
- "arrow-array",
- "arrow-schema",
- "arrow-select",
- "chrono",
- "futures",
- "lancedb",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "prolance-ms"
-version = "0.2.0-alpha"
-dependencies = [
- "anyhow",
- "arrow-array",
- "arrow-schema",
- "base64",
- "chrono",
- "flate2",
- "memchr",
- "openproteo-io",
- "prolance-core",
- "quick-xml",
- "serde",
- "serde_json",
- "sha1",
- "sha2",
- "tempfile",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "prolance-py"
-version = "0.2.0-alpha"
-dependencies = [
- "anyhow",
- "futures",
- "lancedb",
- "prolance-core",
- "prolance-ms",
- "pyo3",
- "tokio",
-]
-
-[[package]]
 name = "prost"
 version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4822,6 +4751,77 @@ checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "speclance-cli"
+version = "0.2.0-alpha"
+dependencies = [
+ "anyhow",
+ "clap",
+ "futures",
+ "indicatif",
+ "lancedb",
+ "serde_json",
+ "speclance-core",
+ "speclance-ms",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "speclance-core"
+version = "0.2.0-alpha"
+dependencies = [
+ "anyhow",
+ "arrow-array",
+ "arrow-schema",
+ "arrow-select",
+ "chrono",
+ "futures",
+ "lancedb",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "speclance-ms"
+version = "0.2.0-alpha"
+dependencies = [
+ "anyhow",
+ "arrow-array",
+ "arrow-schema",
+ "base64",
+ "chrono",
+ "flate2",
+ "memchr",
+ "openproteo-io",
+ "quick-xml",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "speclance-core",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "speclance-py"
+version = "0.2.0-alpha"
+dependencies = [
+ "anyhow",
+ "futures",
+ "lancedb",
+ "pyo3",
+ "speclance-core",
+ "speclance-ms",
+ "tokio",
 ]
 
 [[package]]

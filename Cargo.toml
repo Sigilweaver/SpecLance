@@ -1,9 +1,9 @@
 [workspace]
 members = [
-    "crates/prolance-core",
-    "crates/prolance-ms",
-    "crates/prolance-cli",
-    "crates/prolance-py",
+    "crates/speclance-core",
+    "crates/speclance-ms",
+    "crates/speclance-cli",
+    "crates/speclance-py",
 ]
 resolver = "2"
 
@@ -13,10 +13,10 @@ edition = "2021"
 rust-version = "1.75"
 license = "Apache-2.0"
 authors = ["Nathan Riley <git@nathanriley.com>"]
-repository = "https://github.com/Sigilweaver/ProLance"
-homepage = "https://sigilweaver.app/prolance/"
-documentation = "https://sigilweaver.app/prolance/docs/"
-keywords = ["proteomics", "lance", "mass-spectrometry", "arrow", "psi-ms"]
+repository = "https://github.com/Sigilweaver/SpecLance"
+homepage = "https://sigilweaver.app/speclance/"
+documentation = "https://sigilweaver.app/speclance/docs/"
+keywords = ["mass-spectrometry", "lance", "arrow", "psi-ms", "proteomics"]
 categories = ["science", "database", "encoding"]
 
 [workspace.dependencies]
@@ -44,7 +44,7 @@ quick-xml = { version = "0.36", features = ["serialize"] }
 flate2 = "1"
 memchr = "2"
 
-# Vendor readers. ProLance no longer talks to these directly; everything
+# Vendor readers. SpecLance no longer talks to these directly; everything
 # goes through `openproteo-io`. They are kept as workspace deps so that
 # openproteo-io's path resolution stays valid in transitive lookups.
 # Pinned to crates.io releases (no `path =`) so `cargo publish` and CI
@@ -55,8 +55,8 @@ openwraw = "1.1.0"
 openproteo-io = "1.1.0"
 
 # Internal crates
-prolance-core = { version = "=0.2.0-alpha", path = "crates/prolance-core" }
-prolance-ms = { version = "=0.2.0-alpha", path = "crates/prolance-ms" }
+speclance-core = { version = "=0.2.0-alpha", path = "crates/speclance-core" }
+speclance-ms = { version = "=0.2.0-alpha", path = "crates/speclance-ms" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

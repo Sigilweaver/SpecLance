@@ -3,7 +3,7 @@ import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-    title: 'ProLance',
+    title: 'SpecLance',
     tagline: 'Columnar, memory-mapped mass-spectrometry storage built on Lance',
     favicon: 'img/favicon.ico',
 
@@ -17,10 +17,10 @@ const config: Config = {
     themes: ['@docusaurus/theme-mermaid'],
 
     url: 'https://sigilweaver.app',
-    baseUrl: '/prolance/docs/',
+    baseUrl: '/speclance/docs/',
 
     organizationName: 'Sigilweaver',
-    projectName: 'ProLance',
+    projectName: 'SpecLance',
 
     onBrokenLinks: 'throw',
 
@@ -36,7 +36,7 @@ const config: Config = {
                 docs: {
                     routeBasePath: '/',
                     sidebarPath: './sidebars.ts',
-                    editUrl: 'https://github.com/Sigilweaver/ProLance/tree/main/docs/',
+                    editUrl: 'https://github.com/Sigilweaver/SpecLance/tree/main/docs/',
                 },
                 blog: false,
                 sitemap: {
@@ -53,8 +53,8 @@ const config: Config = {
 
     themeConfig: {
         metadata: [
-            { name: 'keywords', content: 'ProLance, mass spectrometry, proteomics, Lance, Arrow, mzML, OpenProteo, columnar storage, Rust, Python' },
-            { name: 'description', content: 'ProLance is a columnar, memory-mapped mass-spectrometry store built on Lance. Ingests via OpenProteo or mzML; queryable from Rust and Python.' },
+            { name: 'keywords', content: 'SpecLance, mass spectrometry, proteomics, Lance, Arrow, mzML, OpenProteo, columnar storage, Rust, Python' },
+            { name: 'description', content: 'SpecLance is a columnar, memory-mapped mass-spectrometry store built on Lance. Ingests via OpenProteo or mzML; queryable from Rust and Python.' },
         ],
         colorMode: {
             defaultMode: 'dark',
@@ -77,11 +77,11 @@ const config: Config = {
                 },
                 {
                     label: 'Core',
-                    href: 'https://docs.rs/prolance-core',
+                    href: 'https://docs.rs/speclance-core',
                     position: 'left',
                 },
                 {
-                    href: 'https://github.com/Sigilweaver/ProLance',
+                    href: 'https://github.com/Sigilweaver/SpecLance',
                     label: 'GitHub',
                     position: 'right',
                 },
@@ -93,8 +93,8 @@ const config: Config = {
                 {
                     title: 'Project',
                     items: [
-                        { label: 'GitHub', href: 'https://github.com/Sigilweaver/ProLance' },
-                        { label: 'Issues', href: 'https://github.com/Sigilweaver/ProLance/issues' },
+                        { label: 'GitHub', href: 'https://github.com/Sigilweaver/SpecLance' },
+                        { label: 'Issues', href: 'https://github.com/Sigilweaver/SpecLance/issues' },
                     ],
                 },
                 {
@@ -113,7 +113,7 @@ const config: Config = {
                     ],
                 },
             ],
-            copyright: `Copyright ${new Date().getFullYear()} Sigilweaver Holdings LLC. ProLance is Apache-2.0 licensed. Documentation licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC-BY-SA 4.0</a>.`,
+            copyright: `Copyright ${new Date().getFullYear()} Sigilweaver Holdings LLC. SpecLance is Apache-2.0 licensed. Documentation licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC-BY-SA 4.0</a>.`,
         },
         prism: {
             theme: prismThemes.github,

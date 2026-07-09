@@ -1,7 +1,7 @@
-# ProLance documentation site
+# SpecLance documentation site
 
-Docusaurus site for ProLance. Local dev runs on port `25818`,
-deployed to `https://sigilweaver.app/prolance/docs/`.
+Docusaurus site for SpecLance. Local dev runs on port `25818`,
+deployed to `https://sigilweaver.app/speclance/docs/`.
 
 ```bash
 bun install

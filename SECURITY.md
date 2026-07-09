@@ -13,15 +13,15 @@ Only the latest published release receives security updates.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Report privately via [GitHub Security Advisories](https://github.com/Sigilweaver/ProLance/security/advisories/new).
+Report privately via [GitHub Security Advisories](https://github.com/Sigilweaver/SpecLance/security/advisories/new).
 
 Include:
 
 - A description of the vulnerability and its potential impact.
 - Steps to reproduce or a proof of concept (a small input file is
   ideal).
-- The affected crate (`prolance-core`, `prolance-ms`, `prolance-cli`,
-  or `prolance-py`).
+- The affected crate (`speclance-core`, `speclance-ms`, `speclance-cli`,
+  or `speclance-py`).
 - The OS, Rust toolchain, and crate version you were running.
 
 Expect an initial acknowledgment within 7 days.
@@ -30,13 +30,13 @@ Expect an initial acknowledgment within 7 days.
 
 In scope:
 
-- **Parser / writer correctness on malicious input.** ProLance
+- **Parser / writer correctness on malicious input.** SpecLance
   ingests vendor formats (via `openproteo-io`) and mzML, and writes
   Lance datasets. Crashes (panics, OOB reads, infinite loops),
   arbitrary file writes, or memory corruption triggered by a crafted
   input file are in scope.
-- **Path-traversal or arbitrary-file-write bugs** in `prolance-cli`
-  and `prolance-py`.
+- **Path-traversal or arbitrary-file-write bugs** in `speclance-cli`
+  and `speclance-py`.
 - **Supply-chain integrity** of published artifacts on crates.io and
   PyPI: tampered manifests, missing provenance, unsigned releases.
 
@@ -47,7 +47,7 @@ Out of scope:
 - Vulnerabilities in third-party crates with no demonstrated exploit
   path through this stack. Forward those upstream.
 - Issues in vendor parsers themselves - those should be filed against
-  the upstream repo. ProLance delegates all vendor ingest to
+  the upstream repo. SpecLance delegates all vendor ingest to
   `openproteo-io`, so parser bugs typically belong in
   [OpenProteo](https://github.com/Sigilweaver/OpenProteo) or the
   vendor-specific reader.

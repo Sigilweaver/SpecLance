@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "speclance"
+dynamic = ["version"]
+description = "Python bindings for SpecLance (Lance-backed MS data store)"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+authors = [{ name = "Nathan Riley", email = "git@nathanriley.com" }]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "speclance._speclance"
+manifest-path = "Cargo.toml"
+python-source = "python"

@@ -1,10 +1,10 @@
-# Publish ProLance to crates.io and PyPI on tag push.
+# Publish SpecLance to crates.io and PyPI on tag push.
 #
-# - `prolance-core` (Rust library) -> crates.io
-# - `prolance-ms`   (Rust library) -> crates.io
-# - `prolance`      (Python wheel via maturin matrix) -> PyPI
+# - `speclance-core` (Rust library) -> crates.io
+# - `speclance-ms`   (Rust library) -> crates.io
+# - `speclance`      (Python wheel via maturin matrix) -> PyPI
 #
-# `prolance-cli` (binary) is intentionally not published to crates.io;
+# `speclance-cli` (binary) is intentionally not published to crates.io;
 # release binaries can be added later via a separate workflow.
 #
 # crates.io publish uses CARGO_REGISTRY_TOKEN from the `crates-io`
@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   cargo-publish-core:
-    name: Publish prolance-core to crates.io
+    name: Publish speclance-core to crates.io
     runs-on: ubuntu-latest
     environment:
       name: crates-io
@@ -36,21 +36,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-      - name: Publish prolance-core (skip if version exists)
+      - name: Publish speclance-core (skip if version exists)
         run: |
           VERSION=$(cargo metadata --no-deps --format-version 1 \
-            | python3 -c "import sys,json;[print(p['version']) for p in json.load(sys.stdin)['packages'] if p['name']=='prolance-core']")
-          echo "prolance-core version: $VERSION"
-          if cargo search prolance-core --limit 1 | grep -qE "^prolance-core = \"${VERSION}\""; then
-            echo "prolance-core $VERSION already on crates.io, skipping publish."
+            | python3 -c "import sys,json;[print(p['version']) for p in json.load(sys.stdin)['packages'] if p['name']=='speclance-core']")
+          echo "speclance-core version: $VERSION"
+          if cargo search speclance-core --limit 1 | grep -qE "^speclance-core = \"${VERSION}\""; then
+            echo "speclance-core $VERSION already on crates.io, skipping publish."
           else
-            cargo publish -p prolance-core
+            cargo publish -p speclance-core
           fi
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   cargo-publish-ms:
-    name: Publish prolance-ms to crates.io
+    name: Publish speclance-ms to crates.io
     needs: cargo-publish-core
     runs-on: ubuntu-latest
     environment:
@@ -60,17 +60,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-      # crates.io needs a moment to make prolance-core resolvable.
+      # crates.io needs a moment to make speclance-core resolvable.
       - run: sleep 30
-      - name: Publish prolance-ms (skip if version exists)
+      - name: Publish speclance-ms (skip if version exists)
         run: |
           VERSION=$(cargo metadata --no-deps --format-version 1 \
-            | python3 -c "import sys,json;[print(p['version']) for p in json.load(sys.stdin)['packages'] if p['name']=='prolance-ms']")
-          echo "prolance-ms version: $VERSION"
-          if cargo search prolance-ms --limit 1 | grep -qE "^prolance-ms = \"${VERSION}\""; then
-            echo "prolance-ms $VERSION already on crates.io, skipping publish."
+            | python3 -c "import sys,json;[print(p['version']) for p in json.load(sys.stdin)['packages'] if p['name']=='speclance-ms']")
+          echo "speclance-ms version: $VERSION"
+          if cargo search speclance-ms --limit 1 | grep -qE "^speclance-ms = \"${VERSION}\""; then
+            echo "speclance-ms $VERSION already on crates.io, skipping publish."
           else
-            cargo publish -p prolance-ms
+            cargo publish -p speclance-ms
           fi
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -103,9 +103,9 @@ jobs:
       - uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          # abi3-py39 in prolance-py means one wheel covers Python 3.9+,
+          # abi3-py39 in speclance-py means one wheel covers Python 3.9+,
           # so we only need to build with a single interpreter.
-          args: --release --out dist -i python3.11 --manifest-path crates/prolance-py/Cargo.toml
+          args: --release --out dist -i python3.11 --manifest-path crates/speclance-py/Cargo.toml
           sccache: "true"
           manylinux: auto
           # The manylinux container does not inherit host tools, so install
@@ -133,7 +133,7 @@ jobs:
           path: dist
 
   build-sdist:
-    name: Build prolance sdist
+    name: Build speclance sdist
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -143,19 +143,19 @@ jobs:
       - uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist --manifest-path crates/prolance-py/Cargo.toml
+          args: --out dist --manifest-path crates/speclance-py/Cargo.toml
       - uses: actions/upload-artifact@v4
         with:
-          name: sdist-prolance
+          name: sdist-speclance
           path: dist
 
   publish-pypi:
-    name: Publish prolance to PyPI
+    name: Publish speclance to PyPI
     needs: [build-wheels, build-sdist]
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/prolance
+      url: https://pypi.org/p/speclance
     permissions:
       id-token: write
     steps:
@@ -166,7 +166,7 @@ jobs:
           merge-multiple: true
       - uses: actions/download-artifact@v4
         with:
-          name: sdist-prolance
+          name: sdist-speclance
           path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:

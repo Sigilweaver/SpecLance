@@ -3,9 +3,9 @@ slug: /
 title: Introduction
 ---
 
-# ProLance
+# SpecLance
 
-ProLance is a columnar, memory-mapped mass-spectrometry store built on
+SpecLance is a columnar, memory-mapped mass-spectrometry store built on
 [Lance](https://lancedb.github.io/lance/). It ingests vendor formats
 (via [OpenProteo](https://github.com/Sigilweaver/OpenProteo)) or mzML
 and exposes a queryable store from both Rust and Python with direct
@@ -18,23 +18,23 @@ without notice until 1.0.
 
 | Component        | Purpose                                                       |
 | ---------------- | ------------------------------------------------------------- |
-| `prolance-core`  | Lance store, schema, scalar indexes, range-query API.         |
-| `prolance-ms`    | mzML reader/writer, streaming ingest, vendor feature gates.   |
-| `prolance-cli`   | `prolance` binary: ingest, inspect, query, export back to mzML. |
-| `prolance` (PyPI) | Python bindings (PyO3) backed by `prolance-core` + `prolance-ms`. |
+| `speclance-core`  | Lance store, schema, scalar indexes, range-query API.         |
+| `speclance-ms`    | mzML reader/writer, streaming ingest, vendor feature gates.   |
+| `speclance-cli`   | `speclance` binary: ingest, inspect, query, export back to mzML. |
+| `speclance` (PyPI) | Python bindings (PyO3) backed by `speclance-core` + `speclance-ms`. |
 
 ## Stack position
 
-ProLance sits at the storage layer of the OpenProteo stack:
+SpecLance sits at the storage layer of the OpenProteo stack:
 
 ```
 vendor file (Thermo .raw, Bruker .d/, Waters .raw/, or .mzML)
    |
    v
-openproteo-io  (vendor parsing, all of it - ProLance never touches
+openproteo-io  (vendor parsing, all of it - SpecLance never touches
    |            vendor formats directly)
    v
-prolance-ms / prolance-core  (Lance dataset, indexed by RT and m/z)
+speclance-ms / speclance-core  (Lance dataset, indexed by RT and m/z)
    |
    v
 queries from Rust, Python, or the CLI
@@ -45,22 +45,22 @@ queries from Rust, Python, or the CLI
 The CLI is the fastest way to try it out:
 
 ```bash
-cargo install --git https://github.com/Sigilweaver/ProLance prolance-cli
-prolance ingest path/to/spectra.mzML --store ./run-store
-prolance query ./run-store --rt 30..35 --mz 500..510
+cargo install --git https://github.com/Sigilweaver/SpecLance speclance-cli
+speclance ingest path/to/spectra.mzML --store ./run-store
+speclance query ./run-store --rt 30..35 --mz 500..510
 ```
 
 Python:
 
 ```bash
-pip install prolance
+pip install speclance
 ```
 
 ```python
-from prolance import Store
+from speclance import Store
 store = Store.open("./run-store")
 batch = store.query(rt=(30, 35), mz=(500, 510))
 ```
 
-See [GitHub](https://github.com/Sigilweaver/ProLance) for the current
+See [GitHub](https://github.com/Sigilweaver/SpecLance) for the current
 roadmap and contribution guidelines.

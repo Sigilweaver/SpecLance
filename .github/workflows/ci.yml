@@ -15,10 +15,10 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout ProLance
+      - name: Checkout SpecLance
         uses: actions/checkout@v4
         with:
-          path: ProLance
+          path: SpecLance
 
       # Vendor crates are sibling path dependencies. They must be present
       # for cargo to resolve the workspace, even when vendor features are
@@ -58,40 +58,40 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: ProLance
+          workspaces: SpecLance
 
       - name: cargo fmt
-        working-directory: ProLance
+        working-directory: SpecLance
         run: cargo fmt --all -- --check
 
       - name: cargo clippy (default features)
-        working-directory: ProLance
+        working-directory: SpecLance
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: cargo clippy (all vendor features)
-        working-directory: ProLance
+        working-directory: SpecLance
         run: cargo clippy --workspace --all-targets --features all-vendors -- -D warnings
 
       - name: cargo test (default features)
-        working-directory: ProLance
+        working-directory: SpecLance
         run: cargo test --workspace --all-targets
         env:
           # Skip corpus-dependent tests in CI; they no-op when the path is absent.
-          PROLANCE_RUN_CORPUS_TESTS: "0"
+          SPECLANCE_RUN_CORPUS_TESTS: "0"
 
       - name: cargo test (thermo feature)
-        working-directory: ProLance
-        run: cargo test -p prolance-ms --features thermo --test thermo_adapter
+        working-directory: SpecLance
+        run: cargo test -p speclance-ms --features thermo --test thermo_adapter
 
   python:
     name: Python bindings
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Checkout ProLance
+      - name: Checkout SpecLance
         uses: actions/checkout@v4
         with:
-          path: ProLance
+          path: SpecLance
 
       - name: Checkout OpenTFRaw
         uses: actions/checkout@v4
@@ -126,7 +126,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: ProLance
+          workspaces: SpecLance
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -137,13 +137,13 @@ jobs:
         run: pip install --upgrade pip maturin pytest
 
       - name: Build wheel
-        working-directory: ProLance/crates/prolance-py
+        working-directory: SpecLance/crates/speclance-py
         run: maturin build --release --interpreter python3 --out dist
 
       - name: Install wheel
-        working-directory: ProLance/crates/prolance-py
-        run: pip install --force-reinstall dist/prolance-*.whl
+        working-directory: SpecLance/crates/speclance-py
+        run: pip install --force-reinstall dist/speclance-*.whl
 
       - name: pytest
-        working-directory: ProLance/crates/prolance-py
+        working-directory: SpecLance/crates/speclance-py
         run: pytest tests/ -q

@@ -1,0 +1,26 @@
+[package]
+name = "speclance-py"
+description = "Python bindings for SpecLance (Lance-backed MS data store)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "_speclance"
+crate-type = ["cdylib"]
+
+[dependencies]
+speclance-core = { workspace = true }
+speclance-ms = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+lancedb = { workspace = true }
+anyhow = { workspace = true }
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py39"] }

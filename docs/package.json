@@ -1,5 +1,5 @@
 {
-    "name": "prolance-docs",
+    "name": "speclance-docs",
     "version": "0.0.0",
     "private": true,
     "scripts": {
@@ -7,7 +7,7 @@
         "start": "docusaurus start --port 25818",
         "dev": "docusaurus start --port 25818",
         "build": "docusaurus build",
-        "build:cloudflare": "docusaurus build --out-dir build/prolance/docs",
+        "build:cloudflare": "docusaurus build --out-dir build/speclance/docs",
         "clear": "docusaurus clear",
         "serve": "docusaurus serve",
         "typecheck": "tsc",
