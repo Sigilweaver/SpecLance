@@ -1,31 +1,31 @@
 //! mzML writer.
 //!
-//! Thin adapter over `openproteo_core::write_mzml`. Converts SpecLance's
+//! Thin adapter over `openmassspec_core::write_mzml`. Converts SpecLance's
 //! column-store records (`Run`, `&[Spectrum]`) into
-//! `openproteo_core::{RunMetadata, SpectrumRecord}` and delegates to the
+//! `openmassspec_core::{RunMetadata, SpectrumRecord}` and delegates to the
 //! canonical writer. Output is semantically equivalent (not byte
 //! identical) to whatever the source produced - this is the agreed
 //! roundtrip contract for SpecLance.
 //!
-//! Chromatograms are currently not emitted: `openproteo_core::write_mzml`
+//! Chromatograms are currently not emitted: `openmassspec_core::write_mzml`
 //! is spectrum-centric. The caller-facing signature still accepts a
 //! chromatogram slice for source compatibility; a non-empty slice is
 //! ignored with no error. Re-introduce chromatogram emission via a
-//! dedicated upstream change to `openproteo-core` if it becomes
+//! dedicated upstream change to `openmassspec-core` if it becomes
 //! necessary.
 
 use std::io::Write;
 
-use openproteo_io::core::{
+use openmassspec_io::core::{
     CvTerm, MobilityArrayKind, Polarity, PrecursorInfo, RunMetadata, ScanMode, SpectrumRecord,
 };
-use openproteo_io::VecSource;
+use openmassspec_io::VecSource;
 use speclance_core::{Chromatogram, Run, Spectrum};
 
 use crate::error::{MsError, MsResult};
 
 /// Serialize a run + its spectra to mzML using the canonical
-/// `openproteo_core` writer. Chromatograms are accepted for API
+/// `openmassspec_core` writer. Chromatograms are accepted for API
 /// compatibility but not currently emitted.
 pub fn write_mzml<W: Write>(
     out: &mut W,
@@ -41,8 +41,8 @@ pub fn write_mzml<W: Write>(
         .collect();
 
     let mut src = VecSource::new(metadata, records);
-    openproteo_io::core::write_mzml(&mut src, out)
-        .map_err(|e| MsError::Other(format!("openproteo-core write_mzml: {e}")))?;
+    openmassspec_io::core::write_mzml(&mut src, out)
+        .map_err(|e| MsError::Other(format!("openmassspec-core write_mzml: {e}")))?;
     Ok(())
 }
 
@@ -162,8 +162,8 @@ fn precursor_to_info(p: &speclance_core::Precursor, s: &Spectrum) -> PrecursorIn
     }
 }
 
-fn parse_activation(name: &str) -> Option<openproteo_io::core::Activation> {
-    use openproteo_io::core::Activation as A;
+fn parse_activation(name: &str) -> Option<openmassspec_io::core::Activation> {
+    use openmassspec_io::core::Activation as A;
     let n = name.to_ascii_lowercase();
     if n.contains("electron transfer") {
         Some(A::ETD)

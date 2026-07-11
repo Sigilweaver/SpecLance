@@ -100,7 +100,7 @@ fn roundtrip_real_thermo_mzml_if_present() {
     let second = parse_bytes(&buf, format!("{}-rt", path)).expect("read roundtripped");
     assert_eq!(first.spectra.len(), second.spectra.len(), "spectrum count");
     // NOTE: chromatograms are intentionally not emitted by the current writer
-    // (delegates to openproteo-core, which is spectrum-centric). Re-enable
+    // (delegates to openmassspec-core, which is spectrum-centric). Re-enable
     // when chromatogram support lands upstream.
     let _ = (first.chromatograms.len(), second.chromatograms.len());
     // Spot-check the first and last spectra: peak counts and a few values.

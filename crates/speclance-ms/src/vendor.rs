@@ -1,9 +1,9 @@
 //! Vendor ingest: a single entry point that handles every supported
-//! vendor format via [`openproteo_io`].
+//! vendor format via [`openmassspec_io`].
 //!
 //! Replaces the per-vendor `thermo.rs`, `bruker.rs`, `waters.rs` adapters.
 //! Each of those used to talk directly to its vendor crate and decode peak
-//! arrays itself; this module delegates to `openproteo_io::collect` which
+//! arrays itself; this module delegates to `openmassspec_io::collect` which
 //! drives the canonical `SpectrumSource` implementation for each vendor.
 //!
 //! No mzML intermediate is produced - vendor records (`SpectrumRecord`) are
@@ -13,8 +13,8 @@
 
 use std::path::Path;
 
-use openproteo_io::core::{Polarity, RunMetadata, ScanMode, SpectrumRecord};
-use openproteo_io::{detect_format, VendorFormat};
+use openmassspec_io::core::{Polarity, RunMetadata, ScanMode, SpectrumRecord};
+use openmassspec_io::{detect_format, VendorFormat};
 use speclance_core::{Chromatogram, Precursor, Run, Spectrum};
 use sha2::{Digest, Sha256};
 
@@ -44,8 +44,8 @@ pub fn ingest<P: AsRef<Path>>(path: P) -> MsResult<MzmlData> {
     let size = path_size(&detected.path);
     let run_id = derive_run_id(&source_path, size);
 
-    let (records, meta) = openproteo_io::collect(detected)
-        .map_err(|e| MsError::Other(format!("openproteo-io collect: {e}")))?;
+    let (records, meta) = openmassspec_io::collect(detected)
+        .map_err(|e| MsError::Other(format!("openmassspec-io collect: {e}")))?;
 
     let mut ms1_count = 0u32;
     let mut ms2_count = 0u32;
@@ -168,8 +168,8 @@ fn record_to_spectrum(run_id: &str, rec: &SpectrumRecord) -> Spectrum {
     }
 }
 
-fn activation_name(act: openproteo_io::core::Activation) -> &'static str {
-    use openproteo_io::core::Activation as A;
+fn activation_name(act: openmassspec_io::core::Activation) -> &'static str {
+    use openmassspec_io::core::Activation as A;
     match act {
         A::CID => "collision-induced dissociation",
         A::HCD => "beam-type collision-induced dissociation",

@@ -26,9 +26,9 @@ Crates / packages in this repo: `speclance-core`, `speclance-ms`,
 ## Vendor ingest
 
 SpecLance never talks to vendor formats directly - all vendor reads go
-through `openproteo-io` and all mzML emission goes through
-`openproteo-core`. If you need new vendor functionality, contribute it
-upstream in [OpenProteo](https://github.com/Sigilweaver/OpenProteo)
+through `openmassspec-io` and all mzML emission goes through
+`openmassspec-core`. If you need new vendor functionality, contribute it
+upstream in [OpenMassSpec](https://github.com/Sigilweaver/OpenMassSpec)
 first, then wire it through here.
 
 ## On-disk format

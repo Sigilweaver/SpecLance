@@ -14,11 +14,11 @@ workspace = true
 
 [features]
 default = []
-# openproteo-io is always linked (the canonical mzML writer lives there).
+# openmassspec-io is always linked (the canonical mzML writer lives there).
 # The `vendors` family of features additionally turns on its vendor
 # readers. `thermo`/`bruker`/`waters` are kept as aliases for callers
 # that already use them; they all turn on the same `all` feature set.
-vendors = ["openproteo-io/all"]
+vendors = ["openmassspec-io/all"]
 thermo = ["vendors"]
 bruker = ["vendors"]
 waters = ["vendors"]
@@ -40,7 +40,7 @@ chrono = { workspace = true }
 sha2 = { workspace = true }
 sha1 = { workspace = true }
 
-openproteo-io = { workspace = true }
+openmassspec-io = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

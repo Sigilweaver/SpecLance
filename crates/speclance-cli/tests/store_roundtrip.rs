@@ -43,7 +43,7 @@ async fn store_roundtrip_real_thermo_if_present() {
 
     assert_eq!(spectra.len(), original.spectra.len());
     // Chromatograms survive the Lance roundtrip; they are dropped by the
-    // current openproteo-core-backed mzML writer (spectrum-only).
+    // current openmassspec-core-backed mzML writer (spectrum-only).
     assert_eq!(chromatograms.len(), original.chromatograms.len());
 
     // Emit mzML, re-parse, compare key fields.
@@ -55,7 +55,7 @@ async fn store_roundtrip_real_thermo_if_present() {
     let bytes = std::fs::read(&out_path).unwrap();
     let reread = parse_bytes(&bytes, out_path.to_string_lossy().to_string()).unwrap();
     assert_eq!(reread.spectra.len(), original.spectra.len());
-    // Writer (openproteo-core) does not currently emit chromatograms;
+    // Writer (openmassspec-core) does not currently emit chromatograms;
     // expect 0 on the re-read side. Track upstream for re-enable.
     assert_eq!(reread.chromatograms.len(), 0);
 

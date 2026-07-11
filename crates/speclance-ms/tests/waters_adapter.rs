@@ -6,12 +6,12 @@ use speclance_ms::vendor;
 
 #[test]
 fn waters_ingest_smoke() {
-    let Some(path) = std::env::var("OPENPROTEO_WATERS_RAW").ok().filter(|p| {
+    let Some(path) = std::env::var("OPENMASSSPEC_WATERS_RAW").ok().filter(|p| {
         std::path::Path::new(p).join("_FUNCTNS.INF").is_file()
             || std::path::Path::new(p).join("_extern.inf").is_file()
             || std::path::Path::new(p).is_dir()
     }) else {
-        eprintln!("skip: OPENPROTEO_WATERS_RAW not set");
+        eprintln!("skip: OPENMASSSPEC_WATERS_RAW not set");
         return;
     };
 

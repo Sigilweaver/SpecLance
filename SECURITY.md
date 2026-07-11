@@ -31,7 +31,7 @@ Expect an initial acknowledgment within 7 days.
 In scope:
 
 - **Parser / writer correctness on malicious input.** SpecLance
-  ingests vendor formats (via `openproteo-io`) and mzML, and writes
+  ingests vendor formats (via `openmassspec-io`) and mzML, and writes
   Lance datasets. Crashes (panics, OOB reads, infinite loops),
   arbitrary file writes, or memory corruption triggered by a crafted
   input file are in scope.
@@ -48,8 +48,8 @@ Out of scope:
   path through this stack. Forward those upstream.
 - Issues in vendor parsers themselves - those should be filed against
   the upstream repo. SpecLance delegates all vendor ingest to
-  `openproteo-io`, so parser bugs typically belong in
-  [OpenProteo](https://github.com/Sigilweaver/OpenProteo) or the
+  `openmassspec-io`, so parser bugs typically belong in
+  [OpenMassSpec](https://github.com/Sigilweaver/OpenMassSpec) or the
   vendor-specific reader.
 
 ## Disclosure

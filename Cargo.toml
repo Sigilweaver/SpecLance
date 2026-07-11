@@ -45,14 +45,14 @@ flate2 = "1"
 memchr = "2"
 
 # Vendor readers. SpecLance no longer talks to these directly; everything
-# goes through `openproteo-io`. They are kept as workspace deps so that
-# openproteo-io's path resolution stays valid in transitive lookups.
+# goes through `openmassspec-io`. They are kept as workspace deps so that
+# openmassspec-io's path resolution stays valid in transitive lookups.
 # Pinned to crates.io releases (no `path =`) so `cargo publish` and CI
 # checkouts work without a sibling-repo workspace.
 opentfraw = "1.1.0"
 opentimstdf = "1.1.0"
 openwraw = "1.1.0"
-openproteo-io = "1.1.0"
+openmassspec-io = "1.0.0"
 
 # Internal crates
 speclance-core = { version = "=0.2.0-alpha", path = "crates/speclance-core" }

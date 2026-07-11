@@ -7,7 +7,7 @@ title: Introduction
 
 SpecLance is a columnar, memory-mapped mass-spectrometry store built on
 [Lance](https://lancedb.github.io/lance/). It ingests vendor formats
-(via [OpenProteo](https://github.com/Sigilweaver/OpenProteo)) or mzML
+(via [OpenMassSpec](https://github.com/Sigilweaver/OpenMassSpec)) or mzML
 and exposes a queryable store from both Rust and Python with direct
 PyArrow / Polars / Pandas integration.
 
@@ -25,13 +25,13 @@ without notice until 1.0.
 
 ## Stack position
 
-SpecLance sits at the storage layer of the OpenProteo stack:
+SpecLance sits at the storage layer of the OpenMassSpec stack:
 
 ```
 vendor file (Thermo .raw, Bruker .d/, Waters .raw/, or .mzML)
    |
    v
-openproteo-io  (vendor parsing, all of it - SpecLance never touches
+openmassspec-io  (vendor parsing, all of it - SpecLance never touches
    |            vendor formats directly)
    v
 speclance-ms / speclance-core  (Lance dataset, indexed by RT and m/z)

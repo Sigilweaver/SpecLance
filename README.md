@@ -4,13 +4,13 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust MSRV](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 
-> Part of the [OpenProteo](https://sigilweaver.app/openproteo/docs/)
+> Part of the [OpenMassSpec](https://sigilweaver.app/openmassspec/docs/)
 > stack for mass spectrometry raw-file access. SpecLance is the columnar
 > storage layer; vendor readers
 > [OpenWRaw](https://github.com/Sigilweaver/OpenWRaw),
 > [OpenTFRaw](https://github.com/Sigilweaver/OpenTFRaw), and
 > [OpenTimsTDF](https://github.com/Sigilweaver/OpenTimsTDF) feed it
-> through [openproteo-io](https://github.com/Sigilweaver/OpenProteo).
+> through [openmassspec-io](https://github.com/Sigilweaver/OpenMassSpec).
 
 A fast, columnar, memory-mapped mass spectrometry data store powered by [Lance].
 

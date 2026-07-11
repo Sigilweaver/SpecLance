@@ -6,6 +6,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- Dependency renamed `openproteo-io` -> `openmassspec-io` (1.0.0),
+  following the umbrella's rename from OpenProteo to OpenMassSpec.
+  No behavioral change.
+
 ## [0.2.0-alpha] - 2026-05-31
 
 First public alpha. SpecLance moves from `develop` to `main` as the

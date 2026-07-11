@@ -53,8 +53,8 @@ const config: Config = {
 
     themeConfig: {
         metadata: [
-            { name: 'keywords', content: 'SpecLance, mass spectrometry, proteomics, Lance, Arrow, mzML, OpenProteo, columnar storage, Rust, Python' },
-            { name: 'description', content: 'SpecLance is a columnar, memory-mapped mass-spectrometry store built on Lance. Ingests via OpenProteo or mzML; queryable from Rust and Python.' },
+            { name: 'keywords', content: 'SpecLance, mass spectrometry, proteomics, Lance, Arrow, mzML, OpenMassSpec, columnar storage, Rust, Python' },
+            { name: 'description', content: 'SpecLance is a columnar, memory-mapped mass-spectrometry store built on Lance. Ingests via OpenMassSpec or mzML; queryable from Rust and Python.' },
         ],
         colorMode: {
             defaultMode: 'dark',
@@ -71,8 +71,8 @@ const config: Config = {
             },
             items: [
                 {
-                    label: 'OpenProteo',
-                    href: 'https://sigilweaver.app/openproteo/docs/',
+                    label: 'OpenMassSpec',
+                    href: 'https://sigilweaver.app/openmassspec/docs/',
                     position: 'left',
                 },
                 {
@@ -100,8 +100,8 @@ const config: Config = {
                 {
                     title: 'Stack',
                     items: [
-                        { label: 'OpenProteo', href: 'https://github.com/Sigilweaver/OpenProteo' },
-                        { label: 'OpenProteoCore', href: 'https://github.com/Sigilweaver/OpenProteoCore' },
+                        { label: 'OpenMassSpec', href: 'https://github.com/Sigilweaver/OpenMassSpec' },
+                        { label: 'OpenMassSpecCore', href: 'https://github.com/Sigilweaver/OpenMassSpecCore' },
                         { label: 'Lance', href: 'https://lancedb.github.io/lance/' },
                     ],
                 },

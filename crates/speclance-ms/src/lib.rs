@@ -1,7 +1,7 @@
 //! SpecLance ingest adapters and mzML reader/writer.
 //!
 //! The mzML codec is built-in. Vendor ingest is a single module
-//! ([`vendor`]) that drives [`openproteo_io`] - no direct vendor-crate
+//! ([`vendor`]) that drives [`openmassspec_io`] - no direct vendor-crate
 //! dependencies live here.
 
 pub mod error;
