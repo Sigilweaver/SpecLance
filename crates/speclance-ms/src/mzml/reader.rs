@@ -26,10 +26,10 @@ use std::path::Path;
 
 use base64::Engine;
 use flate2::read::ZlibDecoder;
-use speclance_core::{Chromatogram, Precursor, Run, Spectrum};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
+use speclance_core::{Chromatogram, Precursor, Run, Spectrum};
 
 use crate::error::{MsError, MsResult};
 

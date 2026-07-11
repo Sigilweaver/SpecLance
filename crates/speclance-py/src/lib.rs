@@ -12,13 +12,13 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use pyo3::exceptions::{PyIOError, PyValueError};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
 use speclance_core::{
     batches_to_chromatograms, batches_to_runs, batches_to_spectra, Store as CoreStore,
 };
 use speclance_ms::mzml::MzmlIngest;
-use pyo3::exceptions::{PyIOError, PyValueError};
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
 use tokio::runtime::Runtime;
 
 const SPECTRUM_CHUNK: usize = 2048;

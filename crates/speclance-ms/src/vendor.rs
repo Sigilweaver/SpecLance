@@ -15,8 +15,8 @@ use std::path::Path;
 
 use openmassspec_io::core::{Polarity, RunMetadata, ScanMode, SpectrumRecord};
 use openmassspec_io::{detect_format, VendorFormat};
-use speclance_core::{Chromatogram, Precursor, Run, Spectrum};
 use sha2::{Digest, Sha256};
+use speclance_core::{Chromatogram, Precursor, Run, Spectrum};
 
 use crate::error::{MsError, MsResult};
 use crate::mzml::MzmlData;
