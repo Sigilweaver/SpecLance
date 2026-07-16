@@ -12,6 +12,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   following the umbrella's rename from OpenProteo to OpenMassSpec.
   No behavioral change.
 
+### Documentation
+
+- Added a Python API reference page (`guide/python-api`) to the docs
+  site, covering the `speclance` package's `Store` class (`open`,
+  `ingest_mzml`, `create_default_indexes`, `runs`, `query_window`,
+  `chromatograms`). (#2, contributed by @Nabejo)
+
 ## [0.2.0-alpha] - 2026-05-31
 
 First public alpha. SpecLance moves from `develop` to `main` as the
