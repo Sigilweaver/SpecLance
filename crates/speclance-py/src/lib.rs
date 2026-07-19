@@ -4,11 +4,6 @@
 //! Tokio runtime. Spectra are returned as plain Python dicts so the
 //! binding does not require pyarrow at import time.
 
-// pyo3 0.22's pymethods macros emit `into()` calls that clippy flags
-// as `useless_conversion` for some return types. Silence at the crate
-// level rather than peppering attributes on every method.
-#![allow(clippy::useless_conversion)]
-
 use std::path::Path;
 use std::sync::Arc;
 
@@ -130,9 +125,9 @@ impl PyStore {
             })
             .map_err(map_err)?;
         let runs = batches_to_runs(&batches);
-        let list = PyList::empty_bound(py);
+        let list = PyList::empty(py);
         for r in runs {
-            let d = PyDict::new_bound(py);
+            let d = PyDict::new(py);
             d.set_item("run_id", r.run_id)?;
             d.set_item("source_path", r.source_path)?;
             d.set_item("source_format", r.source_format)?;
@@ -179,9 +174,9 @@ impl PyStore {
         if let Some(n) = limit {
             spectra.truncate(n);
         }
-        let list = PyList::empty_bound(py);
+        let list = PyList::empty(py);
         for s in spectra {
-            let d = PyDict::new_bound(py);
+            let d = PyDict::new(py);
             d.set_item("run_id", s.run_id)?;
             d.set_item("scan_num", s.scan_num)?;
             d.set_item("ms_level", s.ms_level)?;
@@ -206,9 +201,9 @@ impl PyStore {
             .block_on(async move { store.read_chromatograms(&run_id_owned).await })
             .map_err(map_err)?;
         let chroms = batches_to_chromatograms(&batches);
-        let list = PyList::empty_bound(py);
+        let list = PyList::empty(py);
         for c in chroms {
-            let d = PyDict::new_bound(py);
+            let d = PyDict::new(py);
             d.set_item("run_id", c.run_id)?;
             d.set_item("chrom_id", c.chrom_id)?;
             d.set_item("chrom_type", c.chrom_type)?;

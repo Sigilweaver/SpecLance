@@ -21,6 +21,7 @@
 //! reassemble a byte-identical document outside the spectrum and
 //! chromatogram lists.
 
+use std::borrow::Cow;
 use std::io::Read as _;
 use std::path::Path;
 
@@ -411,7 +412,11 @@ fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
             }
             Event::Text(t) if stack.last().map(|s| s.as_str()) == Some("binary") => {
                 if let Some(state) = current_binary.as_mut() {
-                    let txt = t.unescape().unwrap_or_default().to_string();
+                    let txt = t
+                        .decode()
+                        .ok()
+                        .and_then(|d| quick_xml::escape::unescape(&d).ok().map(Cow::into_owned))
+                        .unwrap_or_default();
                     state.base64.push_str(txt.trim());
                 }
             }
@@ -434,7 +439,9 @@ fn parse_spectrum_attrs(e: &BytesStart, spec: &mut Spectrum) -> MsResult<()> {
     for attr in e.attributes() {
         let attr = attr?;
         let key = bytes_to_string(attr.key.as_ref());
-        let val = attr.unescape_value()?.to_string();
+        let val = attr
+            .normalized_value(quick_xml::XmlVersion::Implicit1_0)?
+            .to_string();
         match key.as_str() {
             "id" => spec.native_id = Some(val),
             "index" => {
@@ -478,7 +485,9 @@ fn parse_cv(e: &BytesStart, kind: &str) -> MsResult<CvParam> {
     for attr in e.attributes() {
         let attr = attr?;
         let key = bytes_to_string(attr.key.as_ref());
-        let val = attr.unescape_value()?.to_string();
+        let val = attr
+            .normalized_value(quick_xml::XmlVersion::Implicit1_0)?
+            .to_string();
         match key.as_str() {
             "accession" => cv.accession = Some(val),
             "name" => cv.name = Some(val),
@@ -819,7 +828,9 @@ fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
                     for attr in e.attributes() {
                         let attr = attr?;
                         if attr.key.as_ref() == b"id" {
-                            chrom.chrom_id = attr.unescape_value()?.to_string();
+                            chrom.chrom_id = attr
+                                .normalized_value(quick_xml::XmlVersion::Implicit1_0)?
+                                .to_string();
                         }
                     }
                 } else if name == "binaryDataArray" {
@@ -881,7 +892,11 @@ fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
             }
             Event::Text(t) if stack.last().map(|s| s.as_str()) == Some("binary") => {
                 if let Some(b) = current_binary.as_mut() {
-                    let txt = t.unescape().unwrap_or_default().to_string();
+                    let txt = t
+                        .decode()
+                        .ok()
+                        .and_then(|d| quick_xml::escape::unescape(&d).ok().map(Cow::into_owned))
+                        .unwrap_or_default();
                     b.base64.push_str(txt.trim());
                 }
             }

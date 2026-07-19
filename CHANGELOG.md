@@ -11,6 +11,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Dependency renamed `openproteo-io` -> `openmassspec-io` (1.0.0),
   following the umbrella's rename from OpenProteo to OpenMassSpec.
   No behavioral change.
+- CI now runs the Rust build/test job and the Python bindings job on
+  macOS and Windows in addition to Linux, matching the wheel matrix
+  already used by the release workflow. Verified with a local build
+  and test pass on Linux; the macOS/Windows runs have not been
+  observed in Actions yet.
+
+### Security
+
+- Bumped `quick-xml` from 0.36 to 0.41 and `pyo3` from 0.22 to 0.29,
+  clearing the RUSTSEC-2025-0020, RUSTSEC-2026-0177, RUSTSEC-2026-0194,
+  and RUSTSEC-2026-0195 advisories. `cargo-audit` no longer needs the
+  `--ignore` flags that were tracking these.
 
 ### Documentation
 
