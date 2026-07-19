@@ -3620,9 +3620,9 @@ dependencies = [
 
 [[package]]
 name = "opentimstdf"
-version = "1.2.3"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb1df1cf8121047289c9e1be91c804fe1538a3d7ff026ff41eafb78d35d4693a"
+checksum = "7fc36622120e26c5f39daec9766ca110eed8895774e5e040cdb97cb62d1959b5"
 dependencies = [
  "openmassspec-core",
  "rusqlite",
