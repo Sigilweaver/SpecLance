@@ -24,7 +24,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout SpecLance
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: SpecLance
 
@@ -32,25 +32,25 @@ jobs:
       # for cargo to resolve the workspace, even when vendor features are
       # disabled. CI checks out each sibling repo from the same owner.
       - name: Checkout OpenTFRaw
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Sigilweaver/OpenTFRaw
           path: OpenTFRaw
 
       - name: Checkout OpenTimsTDF
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Sigilweaver/OpenTimsTDF
           path: OpenTimsTDF
 
       - name: Checkout OpenWRaw
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Sigilweaver/OpenWRaw
           path: OpenWRaw
 
       - name: Checkout OpenMassSpec
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Sigilweaver/OpenMassSpec
           path: OpenMassSpec
@@ -106,30 +106,30 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout SpecLance
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: SpecLance
 
       - name: Checkout OpenTFRaw
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Sigilweaver/OpenTFRaw
           path: OpenTFRaw
 
       - name: Checkout OpenTimsTDF
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Sigilweaver/OpenTimsTDF
           path: OpenTimsTDF
 
       - name: Checkout OpenWRaw
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Sigilweaver/OpenWRaw
           path: OpenWRaw
 
       - name: Checkout OpenMassSpec
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Sigilweaver/OpenMassSpec
           path: OpenMassSpec
