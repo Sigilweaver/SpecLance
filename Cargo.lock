@@ -640,6 +640,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f4c707c6a209cbe82d10abd08e1ea8995e9ea937d2550646e02798948992be0"
 
 [[package]]
+name = "cfb"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a347dcabdae9c31b0825fd6a8bed285ec9c2acb89c47827126d52fa4f59cece3"
+dependencies = [
+ "fnv",
+ "uuid",
+ "web-time",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3625,6 +3636,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "269bca4c2591a28585d6bf10d9ed0332b7d76900a1b02bec41bdc3a2cdcda107"
 
 [[package]]
+name = "openaraw"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8033cdc0867f9e3f1fffc49d314232c1103054d095f233dc526598f29f0bb51"
+dependencies = [
+ "byteorder",
+ "openmassspec-core",
+ "roxmltree",
+ "thiserror",
+]
+
+[[package]]
 name = "openmassspec-core"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3635,11 +3658,14 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io"
-version = "1.0.1"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e47da2cf92cd192b596966e32e54130f18bdd69f141f454bee35af8c57aa460e"
+checksum = "8f26f5cc939249db626cdae2dc0ac8614b4bf065e4f23fb4ab5ebf12565865bd"
 dependencies = [
+ "openaraw",
  "openmassspec-core",
+ "opensxraw",
+ "openszraw",
  "opentfraw",
  "opentimstdf",
  "openwraw",
@@ -3651,6 +3677,30 @@ name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
+
+[[package]]
+name = "opensxraw"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439fd034a2d93c6572be05f6edd03c3a9c0413f1a230838e64cf69f2dfe6fd16"
+dependencies = [
+ "byteorder",
+ "cfb",
+ "openmassspec-core",
+ "thiserror",
+]
+
+[[package]]
+name = "openszraw"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8d722afe689459d2ef0a47d6d84e3be8b3e367c71558a567b0d020bc1b4bd85"
+dependencies = [
+ "byteorder",
+ "cfb",
+ "openmassspec-core",
+ "thiserror",
+]
 
 [[package]]
 name = "opentfraw"
@@ -4383,6 +4433,15 @@ checksum = "1dedc5658c6ecb3bdb5ef5f3295bb9253f42dcf3fd1402c03f6b1f7659c3c4a9"
 dependencies = [
  "bytemuck",
  "byteorder",
+]
+
+[[package]]
+name = "roxmltree"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1964b10c76125c36f8afe190065a4bf9a87bf324842c05701330bba9f1cacbb"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
