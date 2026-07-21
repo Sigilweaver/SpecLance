@@ -38,6 +38,9 @@ pub fn ingest<P: AsRef<Path>>(path: P) -> MsResult<MzmlData> {
         VendorFormat::ThermoRaw => "thermo-raw",
         VendorFormat::BrukerTdf => "bruker-tdf",
         VendorFormat::WatersRaw => "waters-raw",
+        VendorFormat::AgilentMassHunter => "agilent-masshunter",
+        VendorFormat::SciexWiff => "sciex-wiff",
+        VendorFormat::ShimadzuLabSolutions => "shimadzu-labsolutions",
     };
 
     let source_path = detected.path.to_string_lossy().to_string();
