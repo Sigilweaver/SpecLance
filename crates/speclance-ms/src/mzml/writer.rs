@@ -138,6 +138,11 @@ fn spectrum_to_record(idx: usize, s: &Spectrum) -> SpectrumRecord {
         mz: s.mz.clone(),
         intensity: s.intensity.clone(),
         inv_mobility_per_peak: None,
+        // SpecLance has no FAIMS ingest path on any vendor adapter today;
+        // `openmassspec-core` 1.2.0 added this field with no `Default` impl
+        // on `SpectrumRecord`, so every construction site needs it spelled
+        // out explicitly.
+        faims_cv: None,
     }
 }
 
