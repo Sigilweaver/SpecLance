@@ -39,7 +39,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive"] }
 sha2 = "0.11"
 sha1 = "0.11"
-base64 = "0.22"
+base64 = "0.23"
 quick-xml = { version = "0.41", features = ["serialize"] }
 flate2 = "1"
 memchr = "2"
