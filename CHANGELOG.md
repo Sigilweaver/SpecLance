@@ -8,6 +8,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Updated `openmassspec-io` to 1.5.3 and adopted its expanded run and
+  precursor metadata API.
 - Dependency renamed `openproteo-io` -> `openmassspec-io` (1.0.0),
   following the umbrella's rename from OpenProteo to OpenMassSpec.
   No behavioral change.

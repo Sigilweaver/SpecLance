@@ -64,10 +64,14 @@ fn run_to_metadata(run: &Run) -> RunMetadata {
         source_file_format,
         native_id_format,
         instrument: instrument_term(run.instrument.as_deref()),
+        instrument_serial_number: None,
         software_name: "SpecLance".to_string(),
         software_version: env!("CARGO_PKG_VERSION").to_string(),
+        acquisition_software_name: None,
+        acquisition_software_version: None,
         start_timestamp: run.start_time.clone(),
         mobility_array_kind: Some(MobilityArrayKind::InverseReducedVsPerCm2),
+        analyzers: Vec::new(),
     }
 }
 
@@ -164,6 +168,7 @@ fn precursor_to_info(p: &speclance_core::Precursor, s: &Spectrum) -> PrecursorIn
         precursor_native_id: None,
         activation: s.activation.as_deref().and_then(parse_activation),
         analyzer: None,
+        ccs: None,
     }
 }
 
