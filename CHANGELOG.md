@@ -8,8 +8,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- Updated `openmassspec-io` to 1.5.3 and adopted its expanded run and
-  precursor metadata API.
+- Updated `openmassspec-io` to 1.5.4 (which pulls `openmassspec-core` 1.5.0)
+  and adopted its expanded run and precursor metadata API. The new core
+  `SpectrumRecord`/`RunMetadata` `extra` and `acquisition_event_id` fields
+  are defaulted in the mzML writer (empty / `None`); no field is populated
+  yet, so output is unchanged.
 - Dependency renamed `openproteo-io` -> `openmassspec-io` (1.0.0),
   following the umbrella's rename from OpenProteo to OpenMassSpec.
   No behavioral change.
