@@ -60,6 +60,7 @@ fn run_to_metadata(run: &Run) -> RunMetadata {
     let (source_file_format, native_id_format) = format_terms(&run.source_format);
 
     RunMetadata {
+        extra: Default::default(),
         source_file_name,
         source_file_format,
         native_id_format,
@@ -122,6 +123,8 @@ fn spectrum_to_record(idx: usize, s: &Spectrum) -> SpectrumRecord {
     let precursor = s.precursor.as_ref().map(|p| precursor_to_info(p, s));
 
     SpectrumRecord {
+        extra: Default::default(),
+        acquisition_event_id: None,
         index: idx,
         scan_number: s.scan_num,
         native_id,

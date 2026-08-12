@@ -4143,9 +4143,9 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "openaraw"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc8859c58d30270aade4663ae3fdabc2ef089057842fe082a56fabfc1b502892"
+checksum = "512767a3fa4dde40099e1eafcdd8c6590695894a62bd91f7c8c5f7c8b8df1a4f"
 dependencies = [
  "byteorder",
  "openmassspec-core",
@@ -4155,19 +4155,20 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-core"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80a20aae88e3a827a14dab9968be9cd2e2192b7988fa94e3967588f5e0f8de58"
+checksum = "4ff14ab1fb4227689a34adac26485b770381d39f3c7d09019037b610d696a63e"
 dependencies = [
  "flate2",
+ "serde",
  "thiserror",
 ]
 
 [[package]]
 name = "openmassspec-io"
-version = "1.5.3"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8e6bee9e1d1b9d6c569de871d8be4ba073ae713844c5a14eea19f999f481034"
+checksum = "9784c55d94f478af65892bfbeb607060af4222ce232275c019a5353686d52f3f"
 dependencies = [
  "openaraw",
  "openmassspec-core",
@@ -4187,9 +4188,9 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "opensxraw"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e8f336288930ffe05f1b9eef3455c8abd7b30b87764372069ba70cca916ef88"
+checksum = "c07019fe547ec9cc167648a565b9159db670b467464be5dee11eac04d295d520"
 dependencies = [
  "byteorder",
  "cfb",
@@ -4199,9 +4200,9 @@ dependencies = [
 
 [[package]]
 name = "openszraw"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b7c5aaad9630fed60dee329a21c99647184d1b8eeeed409d5d1962bb221db0b"
+checksum = "b3d27f9050347bb9e6a51d0ef06e58faca264eca16a7bda94eee9907eb94cb63"
 dependencies = [
  "byteorder",
  "cfb",
@@ -4211,9 +4212,9 @@ dependencies = [
 
 [[package]]
 name = "opentfraw"
-version = "1.3.7"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "266e258852499103429d7c283077d791f8e3bdc52cfcf4842762d3fff64fa2ce"
+checksum = "dfeb6cfccaa1ae1d967cabda663853c4f402e672e662f4859a2d814b88a37425"
 dependencies = [
  "openmassspec-core",
  "thiserror",
@@ -4221,9 +4222,9 @@ dependencies = [
 
 [[package]]
 name = "opentimstdf"
-version = "1.3.2"
+version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ca61017d85a5b913afe6af545432f50fb4065f5faf4f086a909bd10aa0f85c8"
+checksum = "a5544f415d3b1975c6c1c1d05d135fea0c2a1cb664f6fe8b55f1bb2828c048ff"
 dependencies = [
  "openmassspec-core",
  "rusqlite",
@@ -4233,9 +4234,9 @@ dependencies = [
 
 [[package]]
 name = "openwraw"
-version = "1.2.8"
+version = "1.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bed33784ead4cced4866f8e2718e7d17ac01243199e7343a150beb47130d526"
+checksum = "aab807b15b1a720105646662b2446ffec7c73c0c068ea2755fe454d543a2422a"
 dependencies = [
  "openmassspec-core",
  "thiserror",

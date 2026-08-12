@@ -49,10 +49,10 @@ memchr = "2"
 # openmassspec-io's path resolution stays valid in transitive lookups.
 # Pinned to crates.io releases (no `path =`) so `cargo publish` and CI
 # checkouts work without a sibling-repo workspace.
-opentfraw = "1.1.0"
-opentimstdf = "1.1.0"
-openwraw = "1.1.0"
-openmassspec-io = "1.5.3"
+opentfraw = "1.4.0"
+opentimstdf = "1.3.3"
+openwraw = "1.2.9"
+openmassspec-io = "1.5.4"
 
 # Internal crates
 speclance-core = { version = "=0.2.0-alpha", path = "crates/speclance-core" }
