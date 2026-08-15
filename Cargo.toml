@@ -24,7 +24,7 @@ categories = ["science", "database", "encoding"]
 lancedb = "=0.31.0"
 arrow-array = "=58.3.0"
 arrow-schema = "=58.3.0"
-arrow-select = "=59.1.0"
+arrow-select = "=59.2.0"
 
 # Async + utilities
 futures = "0.3"
