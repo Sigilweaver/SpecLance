@@ -24,6 +24,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Security
 
+- Updated the locked TLS dependencies to `rustls` 0.23.45 and
+  `rustls-webpki` 0.103.15, fixing RUSTSEC-2026-0285. The existing
+  `h2` 0.4.16 security fix and documented audit exceptions are preserved.
+
 - Bumped `quick-xml` from 0.36 to 0.41 and `pyo3` from 0.22 to 0.29,
   clearing the RUSTSEC-2025-0020, RUSTSEC-2026-0177, RUSTSEC-2026-0194,
   and RUSTSEC-2026-0195 advisories. `cargo-audit` no longer needs the
