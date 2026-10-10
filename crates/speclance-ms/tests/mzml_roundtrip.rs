@@ -165,3 +165,33 @@ fn streaming_ingest_matches_parse_bytes() {
         assert_eq!(a.rt, b.rt);
     }
 }
+
+/// The mzML reader stores short activation names ("HCD", "CID", "ETD").
+/// Writing them back out must preserve the method rather than dropping it.
+#[test]
+fn roundtrip_preserves_short_activation_names() {
+    let first = parse_bytes(TINY_MZML.as_bytes(), "tiny.mzML".into()).unwrap();
+    let base = first.spectra[0].clone();
+
+    for act in ["HCD", "CID", "ETD"] {
+        let mut ms2 = base.clone();
+        ms2.ms_level = 2;
+        ms2.native_id = Some("scan=2".into());
+        ms2.activation = Some(act.into());
+        ms2.precursor = Some(speclance_core::Precursor {
+            mz: Some(500.25),
+            charge: Some(2),
+            isolation_window_target: Some(500.25),
+            ..Default::default()
+        });
+
+        let mut buf: Vec<u8> = Vec::new();
+        write_mzml(&mut buf, &first.run, &[ms2], &[]).unwrap();
+        let second = parse_bytes(&buf, "act.mzML".into()).unwrap();
+        assert_eq!(
+            second.spectra[0].activation.as_deref(),
+            Some(act),
+            "activation {act} did not survive write/read"
+        );
+    }
+}
