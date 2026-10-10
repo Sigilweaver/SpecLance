@@ -21,7 +21,6 @@
 //! reassemble a byte-identical document outside the spectrum and
 //! chromatogram lists.
 
-use std::borrow::Cow;
 use std::io::Read as _;
 use std::path::Path;
 
@@ -412,12 +411,15 @@ fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
             }
             Event::Text(t) if stack.last().map(|s| s.as_str()) == Some("binary") => {
                 if let Some(state) = current_binary.as_mut() {
-                    let txt = t
-                        .decode()
-                        .ok()
-                        .and_then(|d| quick_xml::escape::unescape(&d).ok().map(Cow::into_owned))
-                        .unwrap_or_default();
+                    let txt = decode_text(&t)?;
                     state.base64.push_str(txt.trim());
+                }
+            }
+            Event::GeneralRef(r) if stack.last().map(|s| s.as_str()) == Some("binary") => {
+                if let Some(state) = current_binary.as_mut() {
+                    if let Some(c) = binary_char_ref(&r)? {
+                        state.base64.push(c);
+                    }
                 }
             }
             Event::Eof => break,
@@ -435,6 +437,34 @@ fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
     Ok(spec)
 }
 
+/// Decode and unescape an XML text node (binary array payloads).
+fn decode_text(t: &quick_xml::events::BytesText) -> MsResult<String> {
+    let decoded = t
+        .decode()
+        .map_err(|e| MsError::Xml(format!("text decode: {e}")))?;
+    let unescaped = quick_xml::escape::unescape(&decoded)
+        .map_err(|e| MsError::Xml(format!("text unescape: {e}")))?;
+    Ok(unescaped.into_owned())
+}
+
+/// Resolve an entity reference inside `<binary>`. Base64 needs no
+/// entities, so only numeric character references are accepted
+/// (whitespace is dropped); a named entity is an error rather than being
+/// silently skipped.
+fn binary_char_ref(r: &quick_xml::events::BytesRef) -> MsResult<Option<char>> {
+    match r.resolve_char_ref() {
+        Ok(Some(c)) if c.is_whitespace() => Ok(None),
+        Ok(Some(c)) => Ok(Some(c)),
+        Ok(None) => Err(MsError::Malformed(format!(
+            "entity reference &{}; inside <binary>",
+            String::from_utf8_lossy(r.as_ref())
+        ))),
+        Err(e) => Err(MsError::Malformed(format!(
+            "bad character reference inside <binary>: {e}"
+        ))),
+    }
+}
+
 fn parse_spectrum_attrs(e: &BytesStart, spec: &mut Spectrum) -> MsResult<()> {
     for attr in e.attributes() {
         let attr = attr?;
@@ -445,7 +475,10 @@ fn parse_spectrum_attrs(e: &BytesStart, spec: &mut Spectrum) -> MsResult<()> {
         match key.as_str() {
             "id" => spec.native_id = Some(val),
             "index" => {
-                spec.scan_num = val.parse::<u32>().unwrap_or(0).saturating_add(1);
+                let index = val.parse::<u32>().map_err(|e| {
+                    MsError::Malformed(format!("spectrum index attribute {val:?}: {e}"))
+                })?;
+                spec.scan_num = index.saturating_add(1);
             }
             _ => {}
         }
@@ -900,12 +933,15 @@ fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
             }
             Event::Text(t) if stack.last().map(|s| s.as_str()) == Some("binary") => {
                 if let Some(b) = current_binary.as_mut() {
-                    let txt = t
-                        .decode()
-                        .ok()
-                        .and_then(|d| quick_xml::escape::unescape(&d).ok().map(Cow::into_owned))
-                        .unwrap_or_default();
+                    let txt = decode_text(&t)?;
                     b.base64.push_str(txt.trim());
+                }
+            }
+            Event::GeneralRef(r) if stack.last().map(|s| s.as_str()) == Some("binary") => {
+                if let Some(b) = current_binary.as_mut() {
+                    if let Some(c) = binary_char_ref(&r)? {
+                        b.base64.push(c);
+                    }
                 }
             }
             Event::Eof => break,

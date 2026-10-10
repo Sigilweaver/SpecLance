@@ -21,6 +21,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   now return `Result` and report a missing or mistyped column as
   `Error::Schema` instead of panicking. This is a breaking change to their
   signatures.
+- The mzML reader reports malformed input instead of guessing: a
+  non-numeric spectrum `index` attribute (was read as scan 1), an
+  undecodable `<binary>` text node (was read as empty), and a named
+  entity inside `<binary>` (was dropped) are now `MsError::Malformed` /
+  `MsError::Xml`.
+- Vendor ingest fails with an IO error when the bundle size cannot be
+  read, instead of hashing a smaller size into the run ID.
 
 ### Changed
 

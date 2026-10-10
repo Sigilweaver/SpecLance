@@ -195,3 +195,19 @@ fn roundtrip_preserves_short_activation_names() {
         );
     }
 }
+
+#[test]
+fn malformed_spectrum_index_is_an_error() {
+    let xml = TINY_MZML.replace(r#"index="0" id="scan=1""#, r#"index="x" id="scan=1""#);
+    let err = parse_bytes(xml.as_bytes(), "bad-index.mzML".into()).unwrap_err();
+    assert!(err.to_string().contains("spectrum index"), "{err}");
+}
+
+#[test]
+fn bad_entity_in_binary_text_is_an_error() {
+    let xml = TINY_MZML.replace(
+        "<binary>AABAQAAAoEAAAPBA</binary>",
+        "<binary>AABAQAAA&bogus;oEAAAPBA</binary>",
+    );
+    assert!(parse_bytes(xml.as_bytes(), "bad-text.mzML".into()).is_err());
+}
