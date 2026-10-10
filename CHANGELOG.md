@@ -6,7 +6,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- mzML export no longer drops the activation method for spectra ingested
+  from mzML. The reader stores short names (`HCD`, `CID`, `ETD`, `PQD`)
+  and the writer only recognised PSI-MS long names, so those spectra were
+  exported with no activation. The writer now accepts both forms.
+- Ingesting a run that is already in the store is now refused with a
+  clear error (`Error::RunExists`) instead of appending a second copy of
+  its rows, which produced duplicate spectra and invalid mzML on export.
+  Applies to the CLI, the Python `ingest_mzml`, and `Store::append_run`.
+  New `Store::contains_run` and `Store::ensure_run_absent` helpers.
+- `batches_to_runs`, `batches_to_spectra`, and `batches_to_chromatograms`
+  now return `Result` and report a missing or mistyped column as
+  `Error::Schema` instead of panicking. This is a breaking change to their
+  signatures.
+
 ### Changed
+
+- MSRV raised to Rust 1.95 (`rust-version` was 1.75, which the `lance` /
+  `lancedb` / `openmassspec-io` dependencies already exceeded).
+- Removed the unused `arrow-select` dependency.
+- Dependabot now groups `arrow*` and `lance*` updates into one PR, since
+  they must move together.
+- CI no longer checks out the OpenTFRaw, OpenTimsTDF, OpenWRaw, and
+  OpenMassSpec sibling repositories (all are resolved from crates.io) and
+  no longer triggers on the nonexistent `develop` branch.
 
 - Updated `openmassspec-io` to 1.5.4 (which pulls `openmassspec-core` 1.5.0)
   and adopted its expanded run and precursor metadata API. The new core
@@ -29,12 +54,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `h2` 0.4.16 security fix and documented audit exceptions are preserved.
 
 - Bumped `quick-xml` from 0.36 to 0.41 and `pyo3` from 0.22 to 0.29,
-  clearing the RUSTSEC-2025-0020, RUSTSEC-2026-0177, RUSTSEC-2026-0194,
-  and RUSTSEC-2026-0195 advisories. `cargo-audit` no longer needs the
-  `--ignore` flags that were tracking these.
+  clearing RUSTSEC-2025-0020 and RUSTSEC-2026-0177 for SpecLance's own
+  usage. RUSTSEC-2026-0194 and RUSTSEC-2026-0195 are still ignored in
+  `audit.yml`: `lance` pulls `quick-xml` 0.26 transitively (via `pprof` ->
+  `inferno`), and no upstream release clears it yet.
 
 ### Documentation
 
+- README and docs no longer claim things that are not true today. Added
+  Status and Known limitations sections: mzML export is lossy (no
+  chromatograms, extra CV params, or run metadata), MS-Numpress is not
+  supported, `scan_num` for mzML ingest is index + 1, there is no m/z
+  index, and Python returns dicts rather than PyArrow / Polars. The
+  README now lists all six vendor formats and notes that vendor ingest
+  needs `--features all-vendors`. The docs quickstart now uses commands
+  and methods that exist. The design section is marked as design intent.
+- Corrected the 0.2.0-alpha entry below, which overstated what shipped.
 - Added a Python API reference page (`guide/python-api`) to the docs
   site, covering the `speclance` package's `Store` class (`open`,
   `ingest_mzml`, `create_default_indexes`, `runs`, `query_window`,
@@ -48,11 +83,12 @@ and PyPI.
 
 ### Added
 
-- `speclance-core` crate: Lance-backed `Store` with per-run dataset
-  layout, `RunMetadata` / `SpectrumRecord` types, scalar indexes on
-  retention time and m/z, and a range-query API.
+- `speclance-core` crate: Lance-backed `Store` with shared `runs`,
+  `spectra`, and `chromatograms` tables, scalar indexes on run, scan,
+  retention time, and MS level, and a retention-time window query.
 - `speclance-ms` crate: streaming `MzmlIngest` cursor, mzML 1.1.0
-  reader/writer with full roundtrip support, and a `vendors` feature
+  reader, a spectra-only mzML writer (not a lossless roundtrip), and a
+  `vendors` feature
   family (`thermo`, `bruker`, `waters`, `all-vendors`) that turns on
   the matching `openproteo-io` feature set.
 - `speclance-cli` crate: ingestion dispatch by file extension
@@ -60,10 +96,10 @@ and PyPI.
   `.mzML` -> mzML), Lance store management, and `speclance export` to
   emit mzML back out of a store.
 - `speclance-py` crate: PyO3 bindings (`_speclance`) exposing `Store`,
-  ingest, indexing, and range-query against PyArrow / Polars / Pandas.
+  mzML ingest, indexing, and range-query, returning plain dicts.
 - CI: cross-platform (ubuntu / macos / windows) Rust workflow plus a
   dedicated Python wheel job.
-- `CITATION.cff`, `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
+- `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
 - `[workspace.lints]` block forbidding `unsafe_code` across the
   workspace.
 
