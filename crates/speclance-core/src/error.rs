@@ -20,6 +20,12 @@ pub enum Error {
     #[error("not found: {0}")]
     NotFound(String),
 
+    #[error(
+        "run {0} is already in this store; ingesting it again would duplicate its rows. \
+         Use a fresh store, or remove the existing run first"
+    )]
+    RunExists(String),
+
     #[error("{0}")]
     Other(String),
 }
