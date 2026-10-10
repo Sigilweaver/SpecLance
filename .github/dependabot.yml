@@ -4,6 +4,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # arrow-* and lance/lancedb are pinned exactly and must move together
+    # (lancedb fixes the arrow major). Group them so one PR bumps the set.
+    groups:
+      arrow-lance:
+        patterns:
+          - "arrow*"
+          - "lance*"
 
   - package-ecosystem: "pip"
     directory: "/crates/speclance-py"

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["main", "develop"]
+    branches: ["main"]
   pull_request:
-    branches: ["main", "develop"]
+    branches: ["main"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -27,33 +27,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           path: SpecLance
-
-      # Vendor crates are sibling path dependencies. They must be present
-      # for cargo to resolve the workspace, even when vendor features are
-      # disabled. CI checks out each sibling repo from the same owner.
-      - name: Checkout OpenTFRaw
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenTFRaw
-          path: OpenTFRaw
-
-      - name: Checkout OpenTimsTDF
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenTimsTDF
-          path: OpenTimsTDF
-
-      - name: Checkout OpenWRaw
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenWRaw
-          path: OpenWRaw
-
-      - name: Checkout OpenMassSpec
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenMassSpec
-          path: OpenMassSpec
 
       # Cross-platform protoc install (apt-get is Linux-only; this action
       # covers the macOS/Windows runners added alongside the wheel matrix).
@@ -109,30 +82,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           path: SpecLance
-
-      - name: Checkout OpenTFRaw
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenTFRaw
-          path: OpenTFRaw
-
-      - name: Checkout OpenTimsTDF
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenTimsTDF
-          path: OpenTimsTDF
-
-      - name: Checkout OpenWRaw
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenWRaw
-          path: OpenWRaw
-
-      - name: Checkout OpenMassSpec
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenMassSpec
-          path: OpenMassSpec
 
       - name: Install protoc
         uses: arduino/setup-protoc@v3

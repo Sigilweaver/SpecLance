@@ -727,25 +727,29 @@ impl BinaryArrayState {
 fn decode_floats_f64(bytes: &[u8], precision: u8) -> MsResult<Vec<f64>> {
     match precision {
         64 => {
-            if bytes.len() % 8 != 0 {
+            if !bytes.len().is_multiple_of(8) {
                 return Err(MsError::Malformed(
                     "f64 array length not multiple of 8".into(),
                 ));
             }
             Ok(bytes
-                .chunks_exact(8)
-                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .as_chunks::<8>()
+                .0
+                .iter()
+                .map(|c| f64::from_le_bytes(*c))
                 .collect())
         }
         32 => {
-            if bytes.len() % 4 != 0 {
+            if !bytes.len().is_multiple_of(4) {
                 return Err(MsError::Malformed(
                     "f32 array length not multiple of 4".into(),
                 ));
             }
             Ok(bytes
-                .chunks_exact(4)
-                .map(|c| f32::from_le_bytes(c.try_into().unwrap()) as f64)
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|c| f32::from_le_bytes(*c) as f64)
                 .collect())
         }
         _ => Err(MsError::Malformed(format!(
@@ -758,25 +762,29 @@ fn decode_floats_f64(bytes: &[u8], precision: u8) -> MsResult<Vec<f64>> {
 fn decode_floats_f32(bytes: &[u8], precision: u8) -> MsResult<Vec<f32>> {
     match precision {
         64 => {
-            if bytes.len() % 8 != 0 {
+            if !bytes.len().is_multiple_of(8) {
                 return Err(MsError::Malformed(
                     "f64 array length not multiple of 8".into(),
                 ));
             }
             Ok(bytes
-                .chunks_exact(8)
-                .map(|c| f64::from_le_bytes(c.try_into().unwrap()) as f32)
+                .as_chunks::<8>()
+                .0
+                .iter()
+                .map(|c| f64::from_le_bytes(*c) as f32)
                 .collect())
         }
         32 => {
-            if bytes.len() % 4 != 0 {
+            if !bytes.len().is_multiple_of(4) {
                 return Err(MsError::Malformed(
                     "f32 array length not multiple of 4".into(),
                 ));
             }
             Ok(bytes
-                .chunks_exact(4)
-                .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|c| f32::from_le_bytes(*c))
                 .collect())
         }
         _ => Err(MsError::Malformed(format!(
