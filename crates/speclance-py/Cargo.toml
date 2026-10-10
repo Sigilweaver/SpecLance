@@ -8,6 +8,8 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
+publish = false
+exclude = [".gitignore"]
 
 [lints]
 workspace = true

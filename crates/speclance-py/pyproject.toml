@@ -21,3 +21,6 @@ features = ["pyo3/extension-module"]
 module-name = "speclance._speclance"
 manifest-path = "Cargo.toml"
 python-source = "python"
+# Bundle LICENSE into the sdist (repo LICENSE is at the root and maturin
+# include forbids `..`, so a copy is co-located here).
+include = [{ path = "LICENSE", format = "sdist" }]
