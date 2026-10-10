@@ -43,7 +43,7 @@ quick-xml = { version = "0.41", features = ["serialize"] }
 flate2 = "1"
 memchr = "2"
 
-# Vendor readers. SpecLance no longer talks to these directly; everything
+# Vendor readers. SpecLance does not talk to these directly; everything
 # goes through `openmassspec-io`. They are kept as workspace deps so that
 # openmassspec-io's path resolution stays valid in transitive lookups.
 # Pinned to crates.io releases (no `path =`) so `cargo publish` and CI

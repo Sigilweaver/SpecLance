@@ -61,14 +61,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Documentation
 
-- README and docs no longer claim things that are not true today. Added
-  Status and Known limitations sections: mzML export is lossy (no
-  chromatograms, extra CV params, or run metadata), MS-Numpress is not
-  supported, `scan_num` for mzML ingest is index + 1, there is no m/z
-  index, and Python returns dicts rather than PyArrow / Polars. The
-  README now lists all six vendor formats and notes that vendor ingest
-  needs `--features all-vendors`. The docs quickstart now uses commands
-  and methods that exist. The design section is marked as design intent.
+- README and docs no longer overstate what works. Added Status and Known
+  limitations sections (lossy mzML export, no MS-Numpress, mzML
+  `scan_num` is index + 1, no m/z index, Python returns dicts), listed
+  all six vendor formats with the `all-vendors` feature, fixed the docs
+  quickstart commands, and marked the design section as design intent.
 - Corrected the 0.2.0-alpha entry below, which overstated what shipped.
 - Added a Python API reference page (`guide/python-api`) to the docs
   site, covering the `speclance` package's `Store` class (`open`,

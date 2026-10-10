@@ -96,8 +96,8 @@ There are three usage modes:
 3. **Export to mzML.** Write a run from a SpecLance store back out as mzML.
    Today this carries spectra and their typed fields only; chromatograms,
    extra CV params, and run-level metadata are dropped. A lossless
-   `mzML -> SpecLance -> mzML` roundtrip was the original goal and is not
-   met.
+   `mzML -> SpecLance -> mzML` roundtrip is the design target (see
+   [Design Notes](#design-notes)) and is not met.
 
 ## Why Not mzML?
 
@@ -226,9 +226,9 @@ They are stored on mzML ingest but not yet written on export.
 
 ## Design Notes
 
-This section is the original design for a lossless mzML replacement. It
-describes intent, not current behavior. Where they differ, the current
-state is noted; [Known limitations](#known-limitations) is authoritative.
+This section is the design for a lossless mzML replacement. It describes
+the target, not current behavior. Where they differ, the current state is
+noted; [Known limitations](#known-limitations) is authoritative.
 
 ### 1. CV term completeness
 
@@ -242,8 +242,8 @@ roundtrip impossible.
 routinely query (ms level, RT, precursor m/z, charge, activation, polarity,
 centroid flag) to typed Arrow columns so they are fast to filter. Store every
 other CV param for the spectrum as a JSON string in the `cv_params` column.
-The intent was for export to re-emit the typed columns as CV params and
-write the `cv_params` blob back out.
+In the design, export re-emits the typed columns as CV params and writes
+the `cv_params` blob back out.
 
 The same pattern applies at the run level: the `<fileDescription>`,
 `<sampleList>`, `<softwareList>`, `<scanSettingsList>`,
@@ -258,7 +258,7 @@ mzML binary arrays can be stored as 32-bit or 64-bit IEEE 754 floats, and
 some files use MS-Numpress lossless or lossy integer encodings. Internally,
 SpecLance stores all m/z values as Float64 (sufficient for any precision),
 and the `mz_precision` and `intensity_precision` columns record the original
-bit width. The plan was to downcast to the original width on export; the
+bit width. In the design, export downcasts to the original width; the
 current writer does not use these columns.
 
 Current state: MS-Numpress is not supported. Ingest fails on any
@@ -284,8 +284,9 @@ is inconsistent. There are two representation options:
   tuple uniquely identifies each record. This preserves the full 4D dataset
   at the cost of row count.
 
-A `--tims-mode collapsed|expanded` ingest flag was planned. It does not
-exist yet; Bruker ingest uses whatever `openmassspec-io` produces.
+The design selects between them with a `--tims-mode collapsed|expanded`
+ingest flag. Current state: the flag does not exist; Bruker ingest uses
+whatever `openmassspec-io` produces.
 
 ### 4. Chromatograms
 
@@ -315,9 +316,9 @@ term mapping: Thermo filter strings (`FTMS + p ESI Full ms [300.00-1500.00]`),
 Waters function types, Bruker accumulation times. This information is useful
 for debugging and for re-creating accurate mzML output.
 
-The plan was to serialize source-specific scan metadata into the
-`cv_params` JSON column under a `vendor:` prefix and emit it as
-`<userParam>` on export. Current state: not implemented.
+In the design, source-specific scan metadata goes into the `cv_params`
+JSON column under a `vendor:` prefix and is emitted as `<userParam>` on
+export. Current state: not implemented.
 
 ### 7. Library interoperability (Python)
 
@@ -359,10 +360,10 @@ whole run in memory before it is written.
 
 ### 9. Roundtrip correctness
 
-A lossless mzML -> SpecLance -> mzML roundtrip was meant to be the primary
-correctness guarantee. It is not met today (see above), and the current
-tests only check spectrum count and key spectrum fields. A full test suite
-would cover real mzML files spanning:
+In the design, a lossless mzML -> SpecLance -> mzML roundtrip is the
+primary correctness guarantee. Current state: it is not met (see above),
+and the tests only check spectrum count and key spectrum fields. A full
+test suite would cover real mzML files spanning:
 
 - Thermo Orbitrap (DDA and DIA)
 - Bruker timsTOF PASEF
@@ -372,7 +373,7 @@ would cover real mzML files spanning:
 - Files with Numpress-encoded arrays
 - Files with unusual or instrument-vendor-specific CV terms
 
-The test suite will parse the exported mzML with an independent parser
+That suite would parse the exported mzML with an independent parser
 (e.g., `mzdata` or `psims`) and assert equality of spectrum count, CV params,
 retention times, precursor values, and peak arrays to within floating-point
 precision of the original storage width.
