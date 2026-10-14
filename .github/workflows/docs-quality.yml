@@ -1,0 +1,24 @@
+name: Docs quality
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/docs-quality.yml"]
+  pull_request:
+    paths: ["docs/**", ".github/workflows/docs-quality.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Docs (Docusaurus)
+    permissions:
+      contents: read
+    uses: Sigilweaver/ops/.github/workflows/docs.yml@c2f3734fca95d586bf4203ef484f37a6190eb618
+    with:
+      tooling-ref: c2f3734fca95d586bf4203ef484f37a6190eb618
