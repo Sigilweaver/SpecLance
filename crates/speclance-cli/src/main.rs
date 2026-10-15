@@ -128,6 +128,7 @@ const SPECTRUM_CHUNK: usize = 2048;
 async fn ingest_mzml_streaming(store: &Store, path: &Path) -> Result<()> {
     let mut ingest = MzmlIngest::open(path).context("open mzml")?;
     let run_id = ingest.run_id().to_string();
+    store.ensure_run_absent(&run_id).await?;
     let mut buf: Vec<speclance_core::Spectrum> = Vec::with_capacity(SPECTRUM_CHUNK);
     let mut total = 0u32;
     let mut ms1 = 0u32;
@@ -178,6 +179,7 @@ async fn ingest_buffered(store: &Store, data: speclance_ms::mzml::MzmlData) -> R
         data.chromatograms.len(),
         data.run.run_id
     );
+    store.ensure_run_absent(&data.run.run_id).await?;
     store.append_run(&data.run).await?;
     for chunk in data.spectra.chunks(SPECTRUM_CHUNK) {
         store.append_spectra(chunk).await?;
@@ -200,7 +202,7 @@ async fn cmd_runs(store: &str) -> Result<()> {
     let table = s.runs_table().await?;
     let stream = table.query().execute().await?;
     let batches: Vec<_> = stream.try_collect().await?;
-    let runs = batches_to_runs(&batches);
+    let runs = batches_to_runs(&batches)?;
     println!(
         "{:<20} {:<10} {:<25} {:<15}",
         "run_id", "format", "instrument", "spectra"
@@ -223,12 +225,12 @@ async fn cmd_export(store: &str, run_id: &str, out: &str) -> Result<()> {
         .read_run(run_id)
         .await?
         .context("run not found in store")?;
-    let runs = batches_to_runs(std::slice::from_ref(&run_batch));
+    let runs = batches_to_runs(std::slice::from_ref(&run_batch))?;
     let run = runs.into_iter().next().context("empty run batch")?;
     let spec_batches = s.read_spectra(run_id).await?;
-    let spectra = batches_to_spectra(&spec_batches);
+    let spectra = batches_to_spectra(&spec_batches)?;
     let chrom_batches = s.read_chromatograms(run_id).await?;
-    let chromatograms = batches_to_chromatograms(&chrom_batches);
+    let chromatograms = batches_to_chromatograms(&chrom_batches)?;
 
     let path = PathBuf::from(out);
     let mut file = std::fs::File::create(&path)?;
@@ -268,7 +270,7 @@ async fn cmd_query(
             ms_level,
         )
         .await?;
-    let spectra = batches_to_spectra(&batches);
+    let spectra = batches_to_spectra(&batches)?;
     let total = spectra.len();
     eprintln!(
         "matched {} spectra (run={}, rt=[{:?},{:?}], ms_level={:?})",

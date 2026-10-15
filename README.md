@@ -2,24 +2,58 @@
 
 [![CI](https://github.com/Sigilweaver/SpecLance/actions/workflows/ci.yml/badge.svg)](https://github.com/Sigilweaver/SpecLance/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust MSRV](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust MSRV](https://img.shields.io/badge/rust-1.95%2B-orange.svg)](https://www.rust-lang.org)
 
 > Part of the [OpenMassSpec](https://sigilweaver.app/openmassspec/docs/)
 > stack for mass spectrometry raw-file access. SpecLance is the columnar
-> storage layer; vendor readers
-> [OpenWRaw](https://github.com/Sigilweaver/OpenWRaw),
-> [OpenTFRaw](https://github.com/Sigilweaver/OpenTFRaw), and
-> [OpenTimsTDF](https://github.com/Sigilweaver/OpenTimsTDF) feed it
-> through [openmassspec-io](https://github.com/Sigilweaver/OpenMassSpec).
+> storage layer; vendor readers feed it through
+> [openmassspec-io](https://github.com/Sigilweaver/OpenMassSpec).
 
 A fast, columnar, memory-mapped mass spectrometry data store powered by [Lance].
 
-SpecLance is a **storage format**, not an analysis framework. Its purpose is to
-serve as a drop-in replacement for mzML in existing proteomics workflows - one
-that is faster to read, cheaper to seek, and can hold many runs in a single
-directory. Researchers should be able to swap `run.mzML` for a SpecLance store,
-retrieve spectra using familiar Python or Rust objects, and feed them directly
-into existing libraries without rewriting any analysis code.
+SpecLance is a **storage format**, not an analysis framework. It ingests mzML
+and vendor raw files into a Lance store that is faster to read, cheaper to
+seek, and can hold many runs in a single directory.
+
+It is not a drop-in replacement for mzML today: mzML export is lossy (see
+[Known limitations](#known-limitations)). Keep your source files.
+
+## Status
+
+Alpha. APIs and the on-disk schema may break without notice until 1.0.
+
+What works today:
+
+- Ingest `.mzML` (streaming) into a store with `runs`, `spectra`, and
+  `chromatograms` tables.
+- Ingest vendor raw data from all six formats `openmassspec-io` supports:
+  Thermo `.raw`, Bruker timsTOF `.d`, Waters `.raw`, Agilent MassHunter
+  `.d`, SCIEX `.wiff`, and Shimadzu LabSolutions `.lcd` / `.qgd`. Vendor
+  ingest is off by default; build with `--features all-vendors`.
+- Scalar indexes on `run_id`, `scan_num`, `rt`, and `ms_level`, and a
+  retention-time window query (CLI `query`, Rust `Store::query_window`,
+  Python `Store.query_window`).
+- Export a run back to mzML (spectra only; see below).
+- Python bindings that return plain `dict` / `list` objects.
+
+### Known limitations
+
+- **Export is lossy.** `speclance export` writes spectra only. It does not
+  emit chromatograms, the stored `cv_params` blobs, or the verbatim
+  `run_metadata` blocks. The output is a valid mzML for the spectra it
+  carries, not a copy of the source.
+- **MS-Numpress is not supported.** Ingest stops with an error on any
+  Numpress-encoded array. Only uncompressed and zlib arrays are read.
+- **`scan_num` does not always match the source.** For mzML ingest it is
+  the spectrum `index` + 1, not the scan number in the nativeID. The
+  original nativeID is kept in `native_id`.
+- **One run, one ingest.** Re-ingesting a run that is already in the store
+  is refused. The `run_id` is derived from the path string and file size,
+  so the same file reached by a different path is not detected.
+- **No m/z index or m/z query.** Queries filter on run, retention time, and
+  MS level only.
+- **No PyArrow / Polars output.** The Python API returns `dict`s and lists.
+- All runs share one set of tables; there is no per-run dataset layout.
 
 ## Vision
 
@@ -28,16 +62,22 @@ flowchart LR
     thermo[".raw (Thermo)"]
     bruker[".d/ (Bruker)"]
     waters[".raw (Waters)"]
+    agilent[".d/ (Agilent)"]
+    sciex[".wiff (SCIEX)"]
+    shimadzu[".lcd / .qgd (Shimadzu)"]
     mzml_in[".mzML"]
 
     store["SpecLance store"]
 
-    libs["analysis libraries\nspectrum_utils · matchms\npyOpenMS · ms2ml"]
-    mzml_out[".mzML (roundtrip)"]
+    libs["analysis libraries\nspectrum_utils, matchms\npyOpenMS, ms2ml"]
+    mzml_out[".mzML (spectra only)"]
 
     thermo -- ingest --> store
     bruker -- ingest --> store
     waters -- ingest --> store
+    agilent -- ingest --> store
+    sciex -- ingest --> store
+    shimadzu -- ingest --> store
     mzml_in -- ingest --> store
 
     store --> libs
@@ -46,17 +86,18 @@ flowchart LR
 
 There are three usage modes:
 
-1. **Ingest from vendor format.** Use the open reader crates (OpenTFRaw,
-   OpenTimsTDF, OpenWRaw) to parse proprietary binary files and write a SpecLance
-   store. No vendor SDK, no Wine, no COM interop.
+1. **Ingest from vendor format.** `openmassspec-io` parses the proprietary
+   files (Thermo, Bruker, Waters, Agilent, SCIEX, Shimadzu) and SpecLance
+   writes the store. No vendor SDK, no Wine, no COM interop. Requires a
+   build with `--features all-vendors`.
 2. **Ingest from mzML.** Parse existing mzML files and write a SpecLance
    store. This is the zero-friction on-ramp for labs that already have mzML
    pipelines.
-3. **Export to mzML.** Reconstruct a spec-valid mzML file from a SpecLance
-   store. The roundtrip `mzML -> SpecLance -> mzML` must yield an effectively
-   identical file: same spectra, same CV terms, same metadata, same ordering.
-   This invariant is what makes SpecLance safe to insert into existing
-   pipelines without data loss.
+3. **Export to mzML.** Write a run from a SpecLance store back out as mzML.
+   Today this carries spectra and their typed fields only; chromatograms,
+   extra CV params, and run-level metadata are dropped. A lossless
+   `mzML -> SpecLance -> mzML` roundtrip is the design target (see
+   [Design Notes](#design-notes)) and is not met.
 
 ## Why Not mzML?
 
@@ -80,49 +121,58 @@ entire mzML file can be answered by reading a fraction of the bytes.
 
 ## Architecture
 
-The workspace will follow the same three-crate pattern as BioLance:
-
 ```
 speclance-core/     Arrow schema definitions, LanceDB table management,
                    shared types (Spectrum, Chromatogram, Run).
 
-speclance-ms/       Ingest adapters.
-                     - mzML reader (noodles or quick-xml + mzml CV table)
-                     - OpenTFRaw adapter (Thermo .raw)
-                     - OpenTimsTDF adapter (Bruker timsTOF .d)
-                     - OpenWRaw adapter (Waters MassLynx .raw)
-                   Each adapter normalises its source into the common
-                   speclance_core::Spectrum type.
+speclance-ms/       mzML reader (quick-xml) and writer, plus a vendor
+                   adapter over openmassspec-io (feature `vendors` /
+                   `all-vendors`). Each source is normalised into the
+                   common speclance_core::Spectrum type.
 
 speclance-cli/      `speclance` binary.
-                     ingest   - write a SpecLance store from any source
-                     query    - filter spectra by RT / MS level / precursor
-                     xic      - extracted ion chromatogram across runs
-                     compare  - cross-run TIC / XIC overlays
-                     export   - reconstruct mzML from a SpecLance store
+                     ingest   - write a SpecLance store from mzML or,
+                                with --features all-vendors, vendor files
+                     runs     - list runs in a store
+                     index    - build the default scalar indexes
+                     query    - filter one run's spectra by RT / MS level
+                     export   - write a run back to mzML (spectra only)
+
+speclance-py/       Python bindings (PyO3 + maturin): Store.open,
+                   ingest_mzml, create_default_indexes, runs,
+                   query_window, chromatograms. mzML ingest only.
 ```
 
-A Python package (`speclance-py`, built with PyO3 + maturin) will expose the
-store via a thin API that returns objects compatible with common analysis
-libraries.
+```bash
+cargo build --release -p speclance-cli                          # mzML only
+cargo build --release -p speclance-cli --features all-vendors   # + vendors
+
+speclance ingest --store ./store run.mzML
+speclance index --store ./store
+speclance runs --store ./store
+speclance query --store ./store --run-id <id> --rt-min 30 --rt-max 35 --ms-level 2
+speclance export --store ./store --run-id <id> --out out.mzML
+```
+
+Cross-run commands (`xic`, `compare`) are not implemented.
 
 ## Schema
 
 ### `runs` table
 
-One row per ingested file.
+One row per ingested file. All runs share the same three tables.
 
 | column           | Arrow type | notes                                   |
 |------------------|------------|-----------------------------------------|
-| run_id           | Utf8       | SHA-256 of the source file path + mtime |
+| run_id           | Utf8       | SHA-256 of source path + size (16 hex)  |
 | source_path      | Utf8       |                                         |
 | source_format    | Utf8       | "mzml", "thermo", "bruker", "waters"    |
 | instrument       | Utf8       | instrument model name from CV / metadata|
-| start_time       | Timestamp  |                                         |
+| start_time       | Utf8       | ISO 8601                                |
 | spectrum_count   | UInt32     |                                         |
 | ms1_count        | UInt32     |                                         |
 | ms2_count        | UInt32     |                                         |
-| run_metadata     | Utf8 (JSON)| full mzML run-level CV params + attrs   |
+| run_metadata     | Utf8 (JSON)| mzML header blocks; stored, not exported|
 
 ### `spectra` table
 
@@ -132,7 +182,7 @@ is self-contained and can be retrieved atomically.
 | column                   | Arrow type          | notes                             |
 |--------------------------|---------------------|-----------------------------------|
 | run_id                   | Utf8                |                                   |
-| scan_num                 | UInt32              | 1-based, matches source           |
+| scan_num                 | UInt32              | 1-based; mzML: index + 1          |
 | native_id                | Utf8                | mzML nativeID string              |
 | ms_level                 | UInt8               | 1, 2, ...                         |
 | rt                       | Float64             | seconds                           |
@@ -153,15 +203,15 @@ is self-contained and can be retrieved atomically.
 | intensity_precision      | UInt8               | 32 or 64 - original storage width |
 | mz                       | LargeList<Float64>  | peak m/z values                   |
 | intensity                | LargeList<Float32>  | peak intensity values             |
-| cv_params                | Utf8 (JSON)         | all spectrum-level CV params      |
+| cv_params                | Utf8 (JSON)         | other CV params; not exported     |
 | scan_window_lower        | Float64             |                                   |
 | scan_window_upper        | Float64             |                                   |
 
 ### `chromatograms` table
 
 mzML documents routinely include chromatogram traces (TIC, BPC, SRM/MRM
-transitions). These are structurally separate from spectra in the mzML schema
-and must be preserved for a lossless roundtrip.
+transitions). These are structurally separate from spectra in the mzML schema.
+They are stored on mzML ingest but not yet written on export.
 
 | column         | Arrow type         | notes                                  |
 |----------------|--------------------|----------------------------------------|
@@ -174,7 +224,11 @@ and must be preserved for a lossless roundtrip.
 | intensity      | LargeList<Float32> | intensity axis                         |
 | cv_params      | Utf8 (JSON)        | all chromatogram-level CV params       |
 
-## Challenges and How to Address Them
+## Design Notes
+
+This section is the design for a lossless mzML replacement. It describes
+the target, not current behavior. Where they differ, the current state is
+noted; [Known limitations](#known-limitations) is authoritative.
 
 ### 1. CV term completeness
 
@@ -188,30 +242,27 @@ roundtrip impossible.
 routinely query (ms level, RT, precursor m/z, charge, activation, polarity,
 centroid flag) to typed Arrow columns so they are fast to filter. Store every
 other CV param for the spectrum as a JSON string in the `cv_params` column.
-On mzML export, the typed columns are re-emitted as CV params with their
-correct accession numbers, and the `cv_params` blob is written out verbatim.
-Nothing is lost even for obscure instrument-specific terms.
+In the design, export re-emits the typed columns as CV params and writes
+the `cv_params` blob back out.
 
-The same pattern applies at the run level: the full `<fileDescription>`,
+The same pattern applies at the run level: the `<fileDescription>`,
 `<sampleList>`, `<softwareList>`, `<scanSettingsList>`,
 `<instrumentConfigurationList>`, and `<dataProcessingList>` blocks are stored
-as JSON in `runs.run_metadata` and written back character-for-character on
-export.
+as JSON in `runs.run_metadata`.
+
+Current state: ingest stores both blobs, but export writes neither.
 
 ### 2. Binary precision preservation
 
 mzML binary arrays can be stored as 32-bit or 64-bit IEEE 754 floats, and
 some files use MS-Numpress lossless or lossy integer encodings. Internally,
 SpecLance stores all m/z values as Float64 (sufficient for any precision),
-but the `mz_precision` and `intensity_precision` columns record the original
-bit width. On export, values are downcast to the original width before
-Base64-encoding, preserving the roundtrip value to within the original
-precision without storing redundant 32-bit copies.
+and the `mz_precision` and `intensity_precision` columns record the original
+bit width. In the design, export downcasts to the original width; the
+current writer does not use these columns.
 
-MS-Numpress re-encoding is deterministic for the lossless variants (Linear
-and Pic), so re-applying the same algorithm on export will yield identical
-encoded bytes. If the source file used Numpress, the `cv_params` blob will
-record that fact and the exporter will apply the matching encoder.
+Current state: MS-Numpress is not supported. Ingest fails on any
+Numpress-encoded array.
 
 ### 3. Ion mobility (4D data from Bruker TIMS)
 
@@ -233,9 +284,9 @@ is inconsistent. There are two representation options:
   tuple uniquely identifies each record. This preserves the full 4D dataset
   at the cost of row count.
 
-SpecLance should support both modes as an ingest flag (`--tims-mode
-collapsed|expanded`). The mzML exporter will use the expanded-mode
-representation when exporting TIMS data.
+The design selects between them with a `--tims-mode collapsed|expanded`
+ingest flag. Current state: the flag does not exist; Bruker ingest uses
+whatever `openmassspec-io` produces.
 
 ### 4. Chromatograms
 
@@ -243,10 +294,10 @@ mzML `<chromatogramList>` is routinely populated by instruments with TIC,
 BPC, and SRM/MRM transition traces. It is separate from the spectrum list
 and cannot be mapped into the spectra table without information loss.
 
-The `chromatograms` table above addresses this directly. On mzML ingest,
-chromatograms are parsed and written to that table. On export, they are
-reconstructed and written as a `<chromatogramList>` block. Any tool that
-expects chromatograms in its mzML output will still find them.
+The `chromatograms` table above addresses this. On mzML ingest,
+chromatograms are parsed and written to that table. Current state: export
+does not write a `<chromatogramList>`, because the upstream
+`openmassspec-core` writer is spectrum-only.
 
 ### 5. Data processing lineage
 
@@ -256,9 +307,7 @@ data (centroiding, deisotoping, denoising, calibration) in a
 (e.g., whether to apply their own centroiding) and must be preserved.
 
 The `run_metadata` JSON column stores the full `<dataProcessingList>` XML
-fragment. The exporter writes it back verbatim. If SpecLance itself transforms
-data during ingest (e.g., vendor-to-mzML conversion adds a processing step),
-a new `<processingMethod>` entry is appended recording the conversion.
+fragment. Current state: export does not write it back.
 
 ### 6. Vendor metadata beyond mzML
 
@@ -267,12 +316,9 @@ term mapping: Thermo filter strings (`FTMS + p ESI Full ms [300.00-1500.00]`),
 Waters function types, Bruker accumulation times. This information is useful
 for debugging and for re-creating accurate mzML output.
 
-Each vendor adapter will serialize its source-specific scan metadata into the
-`cv_params` JSON column using a `vendor:` namespace prefix for fields with no
-PSI-MS accession. On mzML export, fields with a real accession are emitted as
-`<cvParam>` elements; vendor-namespaced fields are emitted as `<userParam>`
-elements. mzML allows `<userParam>` anywhere CV params appear, so no
-information is lost and the file remains schema-valid.
+In the design, source-specific scan metadata goes into the `cv_params`
+JSON column under a `vendor:` prefix and is emitted as `<userParam>` on
+export. Current state: not implemented.
 
 ### 7. Library interoperability (Python)
 
@@ -280,7 +326,8 @@ The primary consumer surface is Python. The most widely-used spectrum
 libraries - `spectrum_utils`, `matchms`, `ms2ml`, `pyOpenMS`, `pyteomics` -
 each define their own spectrum object. None of them read Lance natively.
 
-The `speclance-py` Python package will expose:
+A possible future API (none of this exists yet; today's API is in the
+[Python docs](https://sigilweaver.app/speclance/docs/guide/python-api)):
 
 ```python
 import speclance
@@ -299,27 +346,24 @@ for spec in store.as_matchms(run="run01"):
 mz, intensity = store.peaks(run="run01", scan=5432)
 ```
 
-The adapters are thin wrappers that copy the numpy arrays from the Arrow
-columns directly into the target library's data structures, with zero
-additional parsing.
+The adapters would copy the Arrow columns into the target library's data
+structures with no additional parsing.
 
 ### 8. Large file streaming
 
 A single Orbitrap run can be 1-2 GB of mzML; a full timsTOF PASEF experiment
 can exceed 20 GB. Loading everything into RAM before writing is not feasible.
 
-Ingest will stream spectra in batches (default 10,000 spectra per batch) and
-write each batch as a Lance fragment. Lance's columnar chunking means each
-fragment is independently readable; no seek across the whole store is needed
-for a range query. The CLI will report progress via an `indicatif` progress
-bar, matching the BioLance pattern.
+mzML ingest streams spectra in batches of 2,048 and writes each batch as a
+Lance fragment. Vendor ingest is buffered: `openmassspec-io` returns the
+whole run in memory before it is written.
 
-### 9. Roundtrip correctness as a first-class invariant
+### 9. Roundtrip correctness
 
-The mzML -> SpecLance -> mzML roundtrip is not an afterthought - it is the
-primary correctness guarantee that makes SpecLance safe to deploy as an
-infrastructure swap. It should be tested with a suite of real mzML files
-spanning:
+In the design, a lossless mzML -> SpecLance -> mzML roundtrip is the
+primary correctness guarantee. Current state: it is not met (see above),
+and the tests only check spectrum count and key spectrum fields. A full
+test suite would cover real mzML files spanning:
 
 - Thermo Orbitrap (DDA and DIA)
 - Bruker timsTOF PASEF
@@ -329,7 +373,7 @@ spanning:
 - Files with Numpress-encoded arrays
 - Files with unusual or instrument-vendor-specific CV terms
 
-The test suite will parse the exported mzML with an independent parser
+That suite would parse the exported mzML with an independent parser
 (e.g., `mzdata` or `psims`) and assert equality of spectrum count, CV params,
 retention times, precursor values, and peak arrays to within floating-point
 precision of the original storage width.
@@ -342,19 +386,17 @@ speclance-core
 
 speclance-ms
   speclance-core
-  opentfraw   (Thermo .raw)
-  OpenTimsTDF     (Bruker timsTOF .d)
-  openwraw    (Waters .raw)
-  quick-xml   (mzML ingest)
-  base64      (binary array decoding)
+  openmassspec-io  (mzML writer; vendor readers behind `vendors`)
+  quick-xml        (mzML ingest)
+  base64, flate2   (binary array decoding)
 
 speclance-cli
   speclance-core, speclance-ms
-  clap, tokio, rayon, indicatif
+  clap, tokio, indicatif
 
-speclance-py  (separate maturin crate)
+speclance-py  (maturin crate)
   speclance-core, speclance-ms
-  pyo3, numpy
+  pyo3
 ```
 
 No vendor SDK, no Wine, no COM server, no proprietary runtime dependency of
@@ -364,9 +406,10 @@ any kind.
 
 | project    | role                                              |
 |------------|---------------------------------------------------|
-| OpenTFRaw  | Thermo .raw parser; ingest adapter source         |
-| OpenTimsTDF    | Bruker timsTOF parser; ingest adapter source      |
-| OpenWRaw   | Waters MassLynx parser; ingest adapter source     |
+| openmassspec-io | Vendor dispatch and mzML writer; all vendor ingest goes through it |
+| OpenTFRaw  | Thermo .raw parser (via openmassspec-io)          |
+| OpenTimsTDF    | Bruker timsTOF parser (via openmassspec-io)   |
+| OpenWRaw   | Waters MassLynx parser (via openmassspec-io)      |
 | BioLance   | Conceptual template (VCF -> Lance); sibling project|
 | SpecLance   | Storage layer; delegates parsing to the above     |
 

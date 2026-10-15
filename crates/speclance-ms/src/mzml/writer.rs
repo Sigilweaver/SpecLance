@@ -175,9 +175,27 @@ fn precursor_to_info(p: &speclance_core::Precursor, s: &Spectrum) -> PrecursorIn
     }
 }
 
+/// Map a stored activation string back to the `openmassspec_core` enum.
+///
+/// Two vocabularies reach this function: the mzML reader stores short
+/// forms ("CID", "HCD", "ETD", "PQD", "MPD") and the vendor adapters store
+/// PSI-MS long names ("beam-type collision-induced dissociation", ...).
+/// Short forms are matched exactly first; long names fall through to the
+/// substring checks below. "MPD" has no matching enum variant and maps to
+/// `None`.
 fn parse_activation(name: &str) -> Option<openmassspec_io::core::Activation> {
     use openmassspec_io::core::Activation as A;
-    let n = name.to_ascii_lowercase();
+    let n = name.trim().to_ascii_lowercase();
+    match n.as_str() {
+        "cid" => return Some(A::CID),
+        "hcd" => return Some(A::HCD),
+        "etd" => return Some(A::ETD),
+        "ecd" => return Some(A::ECD),
+        "pqd" => return Some(A::PQD),
+        "irmpd" => return Some(A::IRMPD),
+        "uvpd" => return Some(A::UVPD),
+        _ => {}
+    }
     if n.contains("electron transfer") {
         Some(A::ETD)
     } else if n.contains("electron capture") {
@@ -196,5 +214,41 @@ fn parse_activation(name: &str) -> Option<openmassspec_io::core::Activation> {
         Some(A::PD)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_activation;
+    use openmassspec_io::core::Activation as A;
+
+    #[test]
+    fn parse_activation_accepts_short_forms() {
+        assert_eq!(parse_activation("HCD"), Some(A::HCD));
+        assert_eq!(parse_activation("CID"), Some(A::CID));
+        assert_eq!(parse_activation("ETD"), Some(A::ETD));
+        assert_eq!(parse_activation("PQD"), Some(A::PQD));
+    }
+
+    #[test]
+    fn parse_activation_accepts_long_forms() {
+        assert_eq!(
+            parse_activation("beam-type collision-induced dissociation"),
+            Some(A::HCD)
+        );
+        assert_eq!(
+            parse_activation("collision-induced dissociation"),
+            Some(A::CID)
+        );
+        assert_eq!(
+            parse_activation("electron transfer dissociation"),
+            Some(A::ETD)
+        );
+    }
+
+    #[test]
+    fn parse_activation_unknown_is_none() {
+        assert_eq!(parse_activation("MPD"), None);
+        assert_eq!(parse_activation(""), None);
     }
 }
