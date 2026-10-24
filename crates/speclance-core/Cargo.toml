@@ -16,7 +16,6 @@ workspace = true
 lancedb = { workspace = true }
 arrow-array = { workspace = true }
 arrow-schema = { workspace = true }
-arrow-select = { workspace = true }
 futures = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }

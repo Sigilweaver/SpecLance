@@ -25,7 +25,7 @@ use lancedb::{
     Connection, Table,
 };
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::schema::{
     chromatograms_schema, runs_schema, spectra_schema, CHROMATOGRAMS_TABLE, RUNS_TABLE,
     SPECTRA_TABLE,
@@ -65,8 +65,41 @@ impl Store {
         open_or_create(&self.conn, CHROMATOGRAMS_TABLE, chromatograms_schema()).await
     }
 
-    /// Append a single run row.
+    /// True if any row for `run_id` exists in the runs or spectra table.
+    ///
+    /// Spectra are checked as well as runs because streaming ingest
+    /// writes spectra before the run row, so an interrupted ingest can
+    /// leave spectra without a matching run.
+    pub async fn contains_run(&self, run_id: &str) -> Result<bool> {
+        let names = self.table_names().await?;
+        let filter = format!("run_id = '{}'", run_id.replace('\'', "''"));
+        for name in [RUNS_TABLE, SPECTRA_TABLE] {
+            if !names.iter().any(|n| n == name) {
+                continue;
+            }
+            let table = self.conn.open_table(name).execute().await?;
+            if table.count_rows(Some(filter.clone())).await? > 0 {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Return [`Error::RunExists`] if `run_id` is already in the store.
+    /// Call before writing any rows for a new run.
+    pub async fn ensure_run_absent(&self, run_id: &str) -> Result<()> {
+        if self.contains_run(run_id).await? {
+            return Err(Error::RunExists(run_id.to_string()));
+        }
+        Ok(())
+    }
+
+    /// Append a single run row. Fails with [`Error::RunExists`] if a run
+    /// row with the same `run_id` is already present.
     pub async fn append_run(&self, run: &Run) -> Result<()> {
+        if self.read_run(&run.run_id).await?.is_some() {
+            return Err(Error::RunExists(run.run_id.clone()));
+        }
         let batch = run_to_batch(std::slice::from_ref(run))?;
         let table = self.runs_table().await?;
         table.add(vec![batch]).execute().await?;

@@ -1,10 +1,9 @@
 //! Vendor ingest: a single entry point that handles every supported
 //! vendor format via [`openmassspec_io`].
 //!
-//! Replaces the per-vendor `thermo.rs`, `bruker.rs`, `waters.rs` adapters.
-//! Each of those used to talk directly to its vendor crate and decode peak
-//! arrays itself; this module delegates to `openmassspec_io::collect` which
-//! drives the canonical `SpectrumSource` implementation for each vendor.
+//! This module does not decode vendor bytes itself; it delegates to
+//! `openmassspec_io::collect`, which drives the canonical `SpectrumSource`
+//! implementation for each vendor.
 //!
 //! No mzML intermediate is produced - vendor records (`SpectrumRecord`) are
 //! converted directly into SpecLance [`Spectrum`] / [`Run`] rows. This saves
@@ -44,7 +43,7 @@ pub fn ingest<P: AsRef<Path>>(path: P) -> MsResult<MzmlData> {
     };
 
     let source_path = detected.path.to_string_lossy().to_string();
-    let size = path_size(&detected.path);
+    let size = path_size(&detected.path)?;
     let run_id = derive_run_id(&source_path, size);
 
     let (records, meta) = openmassspec_io::collect(detected)
@@ -189,23 +188,21 @@ fn activation_name(act: openmassspec_io::core::Activation) -> &'static str {
 
 /// Total bytes on disk for a vendor bundle. Handles both single-file
 /// (Thermo `.raw`) and directory (Bruker `.d/`, Waters `.raw/`) layouts.
-fn path_size(path: &Path) -> u64 {
-    if let Ok(meta) = std::fs::metadata(path) {
-        if meta.is_file() {
-            return meta.len();
-        }
+/// The size feeds the run ID, so an unreadable path or entry is an error
+/// rather than a silently smaller total.
+fn path_size(path: &Path) -> MsResult<u64> {
+    let meta = std::fs::metadata(path)?;
+    if meta.is_file() {
+        return Ok(meta.len());
     }
     let mut total = 0u64;
-    if let Ok(rd) = std::fs::read_dir(path) {
-        for entry in rd.flatten() {
-            if let Ok(meta) = entry.metadata() {
-                if meta.is_file() {
-                    total += meta.len();
-                }
-            }
+    for entry in std::fs::read_dir(path)? {
+        let meta = entry?.metadata()?;
+        if meta.is_file() {
+            total += meta.len();
         }
     }
-    total
+    Ok(total)
 }
 
 /// Stable run identifier derived from the source path and total bundle size.

@@ -38,6 +38,9 @@ pyarrow at import time.
 Streams an `.mzML` file into the store using the same streaming reader as
 the CLI, then appends the resulting run and any chromatograms.
 
+If the run is already in the store, this raises `OSError` and writes
+nothing, so ingesting the same file twice does not duplicate rows.
+
 ```python
 run_id = store.ingest_mzml("path/to/run.mzML")
 ```
