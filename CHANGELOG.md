@@ -24,6 +24,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Security
 
+- Updated locked dependencies `rustls` 0.23.46, `rustls-webpki` 0.103.16,
+  `quinn-proto` 0.11.19, and `chacha20` 0.10.2, fixing RUSTSEC-2026-0338
+  through 0342, RUSTSEC-2026-0346 through 0349, and RUSTSEC-2026-0382, and
+  clearing the yanked `chacha20` warning. Lockfile-only change.
+
 - Updated the locked TLS dependencies to `rustls` 0.23.45 and
   `rustls-webpki` 0.103.15, fixing RUSTSEC-2026-0285. The existing
   `h2` 0.4.16 security fix and documented audit exceptions are preserved.
