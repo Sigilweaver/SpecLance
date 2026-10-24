@@ -21,7 +21,7 @@ categories = ["science", "database", "encoding"]
 
 [workspace.dependencies]
 # Storage / Arrow
-lancedb = "=0.31.0"
+lancedb = "=0.40.0"
 arrow-array = "=58.3.0"
 arrow-schema = "=58.3.0"
 arrow-select = "=59.2.0"
