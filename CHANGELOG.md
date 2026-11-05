@@ -28,6 +28,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `rust-version` is now 1.95, the highest minimum among the dependencies
   (`openmassspec-io`, `opentimstdf`; Lance 14 needs 1.94). The previous
   1.75 was already below what the dependency tree required.
+- CI builds dev/test profiles without debuginfo (`CARGO_PROFILE_DEV_DEBUG=0`).
+  With Lance 14 the debuginfo for the workspace test binaries no longer fits
+  on the ubuntu-latest runner's disk.
 - `cargo audit` in CI no longer ignores RUSTSEC-2026-0194/0195: the
   `quick-xml` 0.26 they flag came from Lance's `pprof` dependency, which is
   gone from the tree with Lance 14.
