@@ -24,6 +24,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Security
 
+- Updated the transitive `zstd` 0.13.4, `zstd-safe` 7.4.0 and `zstd-sys`
+  2.1.2 (via `arrow-ipc` and `lance-encoding`) in the lockfile, fixing
+  RUSTSEC-2026-0391, RUSTSEC-2026-0398, RUSTSEC-2026-0403 and
+  RUSTSEC-2026-0410, plus the `zstd-safe` unsoundness warnings
+  RUSTSEC-2026-0395 through -0397, -0399 through -0402 and -0404 through
+  -0406. Also updated `event-listener` to 5.4.2,
+  clearing the RUSTSEC-2026-0221 unsoundness warning. Lockfile-only change.
 - Updated locked dependencies `rustls` 0.23.46, `rustls-webpki` 0.103.16,
   `quinn-proto` 0.11.19, and `chacha20` 0.10.2, fixing RUSTSEC-2026-0338
   through 0342, RUSTSEC-2026-0346 through 0349, and RUSTSEC-2026-0382, and
