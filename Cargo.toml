@@ -51,7 +51,7 @@ memchr = "2"
 opentfraw = "1.4.0"
 opentimstdf = "1.3.3"
 openwraw = "1.2.9"
-openmassspec-io = "1.5.4"
+openmassspec-io = "2.0.0"
 
 # Internal crates
 speclance-core = { version = "=0.2.0-alpha", path = "crates/speclance-core" }
