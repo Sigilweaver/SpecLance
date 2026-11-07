@@ -39,7 +39,7 @@ clap = { version = "4", features = ["derive"] }
 sha2 = "0.11"
 sha1 = "0.11"
 base64 = "0.23"
-quick-xml = { version = "0.41", features = ["serialize"] }
+quick-xml = { version = "0.42", features = ["serialize"] }
 flate2 = "1"
 memchr = "2"
 
