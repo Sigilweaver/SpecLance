@@ -8,6 +8,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Updated `lancedb` from 0.31.0 to 0.41.0 (Lance 8 -> 14, DataFusion 53 ->
+  54). 0.40.0 was skipped because it does not compile without lancedb's
+  `remote` feature. No SpecLance source changes were needed and store
+  behaviour is unchanged: stores written by the previous version open,
+  query, append and re-index under the new one, and a new
+  `store_contract` test suite (on-disk schemas, field round-trips, scan
+  ordering, inclusive and open RT bounds, null RTs, quote escaping in
+  run-id filters, and indexed vs unindexed query results) passes on both
+  the old and the new stack.
+- All Arrow crates now resolve to a single version, 58.4.1 (previously
+  `arrow-array`/`arrow-schema` 58.3.0 alongside an unused `arrow-select`
+  59.2.0, so two Arrow majors were compiled). Arrow stays on major 58
+  because Lance pins it; the unused direct `arrow-select` dependency is
+  removed. Dependabot now groups `arrow*` and `lance*` updates so the set
+  moves together.
+- Updated the locked `opentfraw` (via `openmassspec-io`) from 1.4.0 to
+  1.6.0. Lockfile-only change.
+- `rust-version` is now 1.95, the highest minimum among the dependencies
+  (`openmassspec-io`, `opentimstdf`; Lance 14 needs 1.94). The previous
+  1.75 was already below what the dependency tree required.
+- CI builds dev/test profiles without debuginfo (`CARGO_PROFILE_DEV_DEBUG=0`).
+  With Lance 14 the debuginfo for the workspace test binaries no longer fits
+  on the ubuntu-latest runner's disk.
+- `cargo audit` in CI no longer ignores RUSTSEC-2026-0194/0195: the
+  `quick-xml` 0.26 they flag came from Lance's `pprof` dependency, which is
+  gone from the tree with Lance 14.
 - Updated `openmassspec-io` to 1.5.4 (which pulls `openmassspec-core` 1.5.0)
   and adopted its expanded run and precursor metadata API. The new core
   `SpectrumRecord`/`RunMetadata` `extra` and `acquisition_event_id` fields
