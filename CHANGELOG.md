@@ -12,6 +12,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   unescaped now returns `MsError::Xml` instead of being read as an empty
   string, and element names and attribute keys are no longer converted
   lossily.
+- Updated `openmassspec-io` to 2.0.0 (`openmassspec-core` 3.0). Ingest of a
+  vendor file now fails on the first record that cannot be decoded instead of
+  dropping it. A `VendorFormat` without a SpecLance `source_format` label
+  returns `MsError::Unsupported`. An `Activation` without a SpecLance
+  mapping keeps its variant name as the activation string.
 - Updated `lancedb` from 0.31.0 to 0.41.0 (Lance 8 -> 14, DataFusion 53 ->
   54). 0.40.0 was skipped because it does not compile without lancedb's
   `remote` feature. No SpecLance source changes were needed and store
