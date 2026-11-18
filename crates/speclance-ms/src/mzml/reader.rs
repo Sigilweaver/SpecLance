@@ -411,8 +411,7 @@ fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
             }
             Event::Text(t) if stack.last().map(|s| s.as_str()) == Some("binary") => {
                 if let Some(state) = current_binary.as_mut() {
-                    let txt = quick_xml::escape::unescape(&t.xml10_content())?.into_owned();
-                    state.base64.push_str(txt.trim());
+                    state.base64.push_str(t.xml10_content().trim());
                 }
             }
             Event::GeneralRef(r) if stack.last().map(|s| s.as_str()) == Some("binary") => {
@@ -934,8 +933,7 @@ fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
             }
             Event::Text(t) if stack.last().map(|s| s.as_str()) == Some("binary") => {
                 if let Some(b) = current_binary.as_mut() {
-                    let txt = quick_xml::escape::unescape(&t.xml10_content())?.into_owned();
-                    b.base64.push_str(txt.trim());
+                    b.base64.push_str(t.xml10_content().trim());
                 }
             }
             Event::GeneralRef(r) if stack.last().map(|s| s.as_str()) == Some("binary") => {
