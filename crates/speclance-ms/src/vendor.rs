@@ -41,13 +41,20 @@ pub fn ingest<P: AsRef<Path>>(path: P) -> MsResult<MzmlData> {
         VendorFormat::AgilentMassHunter => "agilent-masshunter",
         VendorFormat::SciexWiff => "sciex-wiff",
         VendorFormat::ShimadzuLabSolutions => "shimadzu-labsolutions",
+        // `VendorFormat` is #[non_exhaustive]: refuse formats SpecLance has
+        // no source_format label for instead of guessing one.
+        other => {
+            return Err(MsError::Unsupported(format!(
+                "vendor format {other:?} has no SpecLance source_format label"
+            )))
+        }
     };
 
     let source_path = detected.path.to_string_lossy().to_string();
     let size = path_size(&detected.path);
     let run_id = derive_run_id(&source_path, size);
 
-    let (records, meta) = openmassspec_io::collect(detected)
+    let (records, meta) = openmassspec_io::collect(&detected)
         .map_err(|e| MsError::Other(format!("openmassspec-io collect: {e}")))?;
 
     let mut ms1_count = 0u32;
@@ -92,7 +99,7 @@ fn build_run(
         run_id,
         source_path: Some(source_path),
         source_format: source_format.into(),
-        instrument: Some(meta.instrument.name.clone()),
+        instrument: Some(meta.instrument.name.to_string()),
         start_time: meta.start_timestamp.clone(),
         ingested_at: Some(chrono::Utc::now().to_rfc3339()),
         spectrum_count: Some(spectrum_count),
@@ -130,7 +137,7 @@ fn record_to_spectrum(run_id: &str, rec: &SpectrumRecord) -> Spectrum {
         .precursor
         .as_ref()
         .and_then(|p| p.activation)
-        .map(|a| activation_name(a).to_string());
+        .map(activation_name);
 
     // `ce_is_nce` flips the unit; SpecLance's column is just an f32, so we drop
     // normalized values rather than report them in the wrong unit.
@@ -171,19 +178,21 @@ fn record_to_spectrum(run_id: &str, rec: &SpectrumRecord) -> Spectrum {
     }
 }
 
-fn activation_name(act: openmassspec_io::core::Activation) -> &'static str {
+fn activation_name(act: openmassspec_io::core::Activation) -> String {
     use openmassspec_io::core::Activation as A;
     match act {
-        A::CID => "collision-induced dissociation",
-        A::HCD => "beam-type collision-induced dissociation",
-        A::ETD | A::EThcD => "electron transfer dissociation",
-        A::MPID => "supplemental beam-type collision-induced dissociation",
-        A::ECD => "electron capture dissociation",
-        A::IRMPD => "infrared multiphoton dissociation",
-        A::PD => "in-source collision-induced dissociation",
-        A::PQD => "pulsed q dissociation",
-        A::UVPD => "ultraviolet photodissociation",
-        A::SID => "beam-type collision-induced dissociation",
+        A::CID => "collision-induced dissociation".to_string(),
+        A::HCD => "beam-type collision-induced dissociation".to_string(),
+        A::ETD | A::EThcD => "electron transfer dissociation".to_string(),
+        A::MPID => "supplemental beam-type collision-induced dissociation".to_string(),
+        A::ECD => "electron capture dissociation".to_string(),
+        A::IRMPD => "infrared multiphoton dissociation".to_string(),
+        A::PD => "in-source collision-induced dissociation".to_string(),
+        A::PQD => "pulsed q dissociation".to_string(),
+        A::UVPD => "ultraviolet photodissociation".to_string(),
+        A::SID => "beam-type collision-induced dissociation".to_string(),
+        // `Activation` is #[non_exhaustive]: keep the variant name for new ones.
+        other => format!("{other:?}"),
     }
 }
 

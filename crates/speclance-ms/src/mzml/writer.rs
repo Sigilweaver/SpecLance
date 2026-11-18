@@ -59,21 +59,17 @@ fn run_to_metadata(run: &Run) -> RunMetadata {
 
     let (source_file_format, native_id_format) = format_terms(&run.source_format);
 
-    RunMetadata {
-        extra: Default::default(),
+    let mut meta = RunMetadata::new(
         source_file_name,
         source_file_format,
         native_id_format,
-        instrument: instrument_term(run.instrument.as_deref()),
-        instrument_serial_number: None,
-        software_name: "SpecLance".to_string(),
-        software_version: env!("CARGO_PKG_VERSION").to_string(),
-        acquisition_software_name: None,
-        acquisition_software_version: None,
-        start_timestamp: run.start_time.clone(),
-        mobility_array_kind: Some(MobilityArrayKind::InverseReducedVsPerCm2),
-        analyzers: Vec::new(),
-    }
+        instrument_term(run.instrument.as_deref()),
+        "SpecLance",
+        env!("CARGO_PKG_VERSION"),
+    );
+    meta.start_timestamp = run.start_time.clone();
+    meta.mobility_array_kind = Some(MobilityArrayKind::InverseReducedVsPerCm2);
+    meta
 }
 
 fn format_terms(source_format: &str) -> (CvTerm, CvTerm) {
@@ -122,35 +118,23 @@ fn spectrum_to_record(idx: usize, s: &Spectrum) -> SpectrumRecord {
 
     let precursor = s.precursor.as_ref().map(|p| precursor_to_info(p, s));
 
-    SpectrumRecord {
-        extra: Default::default(),
-        acquisition_event_id: None,
-        index: idx,
-        scan_number: s.scan_num,
-        native_id,
-        ms_level: s.ms_level as u32,
-        polarity,
-        scan_mode,
-        analyzer: None,
-        filter: None,
-        retention_time_sec: s.rt.unwrap_or(0.0),
-        total_ion_current: s.tic,
-        base_peak_mz: s.base_peak_mz,
-        base_peak_intensity: s.base_peak_intensity,
-        low_mz: s.scan_window_lower,
-        high_mz: s.scan_window_upper,
-        ion_injection_time_ms: None,
-        inv_mobility: s.inv_mobility,
-        precursor,
-        mz: s.mz.clone(),
-        intensity: s.intensity.clone(),
-        inv_mobility_per_peak: None,
-        // SpecLance has no FAIMS ingest path on any vendor adapter today;
-        // `openmassspec-core` 1.2.0 added this field with no `Default` impl
-        // on `SpectrumRecord`, so every construction site needs it spelled
-        // out explicitly.
-        faims_cv: None,
-    }
+    // SpecLance has no FAIMS ingest path on any vendor adapter today, so
+    // `faims_cv`, `analyzer`, `filter`, `acquisition_event_id`,
+    // `ion_injection_time_ms` and `inv_mobility_per_peak` stay `None`.
+    let mut rec = SpectrumRecord::new(idx, s.scan_num, native_id)
+        .with_peaks(s.mz.clone(), s.intensity.clone());
+    rec.ms_level = s.ms_level as u32;
+    rec.polarity = polarity;
+    rec.scan_mode = scan_mode;
+    rec.retention_time_sec = s.rt.unwrap_or(0.0);
+    rec.total_ion_current = s.tic;
+    rec.base_peak_mz = s.base_peak_mz;
+    rec.base_peak_intensity = s.base_peak_intensity;
+    rec.low_mz = s.scan_window_lower;
+    rec.high_mz = s.scan_window_upper;
+    rec.inv_mobility = s.inv_mobility;
+    rec.precursor = precursor;
+    rec
 }
 
 fn precursor_to_info(p: &speclance_core::Precursor, s: &Spectrum) -> PrecursorInfo {
@@ -160,19 +144,16 @@ fn precursor_to_info(p: &speclance_core::Precursor, s: &Spectrum) -> PrecursorIn
         (Some(lo), Some(hi)) => Some(lo + hi),
         _ => None,
     };
-    PrecursorInfo {
-        target_mz: p.isolation_window_target,
-        selected_mz: p.mz,
-        isolation_width,
-        charge: p.charge.map(|z| z as i32),
-        intensity: p.intensity,
-        collision_energy: s.collision_energy.map(|e| e as f64),
-        ce_is_nce: false,
-        precursor_native_id: None,
-        activation: s.activation.as_deref().and_then(parse_activation),
-        analyzer: None,
-        ccs: None,
-    }
+    let mut info = PrecursorInfo::default();
+    info.target_mz = p.isolation_window_target;
+    info.selected_mz = p.mz;
+    info.isolation_width = isolation_width;
+    info.charge = p.charge.map(|z| z as i32);
+    info.intensity = p.intensity;
+    info.collision_energy = s.collision_energy.map(|e| e as f64);
+    info.ce_is_nce = false;
+    info.activation = s.activation.as_deref().and_then(parse_activation);
+    info
 }
 
 fn parse_activation(name: &str) -> Option<openmassspec_io::core::Activation> {
