@@ -3,8 +3,9 @@
 //! The store holds the short names `CID`, `HCD`, `ETD`, `EThcD`, `ECD`,
 //! `IRMPD`, `UVPD`, `PQD`, `SID`, `MPID` and `PD`. The mzML reader and the
 //! vendor ingest emit them, and the mzML writer parses them back. `MPD` is
-//! accepted as an alias of `MPID`. Long PSI-MS term names are also accepted
-//! when writing.
+//! accepted as an alias of `MPID`. Long names in existing stores are accepted
+//! when writing, with the meaning the vendor ingest gave them (see
+//! [`LEGACY_VENDOR_NAMES`]); other long PSI-MS term names are accepted too.
 //!
 //! mzML terms (PSI-MS accessions) and the names they read as:
 //!
@@ -56,6 +57,26 @@ pub(crate) fn activation_label(act: A) -> String {
     name.to_string()
 }
 
+/// Long names the vendor ingest stores, with the activation each one meant.
+/// The ingest wrote the same string for more than one activation in two cases:
+/// `HCD` and `SID` both as "beam-type collision-induced dissociation", and `ETD`
+/// and `EThcD` both as "electron transfer dissociation". Those read as `HCD`
+/// and `ETD`.
+pub(crate) const LEGACY_VENDOR_NAMES: [(&str, A); 9] = [
+    ("collision-induced dissociation", A::CID),
+    ("beam-type collision-induced dissociation", A::HCD),
+    ("electron transfer dissociation", A::ETD),
+    (
+        "supplemental beam-type collision-induced dissociation",
+        A::MPID,
+    ),
+    ("electron capture dissociation", A::ECD),
+    ("infrared multiphoton dissociation", A::IRMPD),
+    ("in-source collision-induced dissociation", A::PD),
+    ("pulsed q dissociation", A::PQD),
+    ("ultraviolet photodissociation", A::UVPD),
+];
+
 /// Activation for a stored name, or `None` when the name is not recognised.
 pub(crate) fn parse_activation(name: &str) -> Option<A> {
     let n = name.trim().to_ascii_lowercase();
@@ -76,7 +97,10 @@ pub(crate) fn parse_activation(name: &str) -> Option<A> {
     if short.is_some() {
         return short;
     }
-    // PSI-MS term names.
+    if let Some((_, act)) = LEGACY_VENDOR_NAMES.iter().find(|(l, _)| *l == n) {
+        return Some(*act);
+    }
+    // Other PSI-MS term names.
     if n.contains("electron-transfer/higher") {
         Some(A::EThcD)
     } else if n.contains("electron transfer") {
@@ -222,16 +246,44 @@ mod tests {
         }
     }
 
+    /// Strings the vendor ingest wrote (`activation_name` in `vendor.rs` from
+    /// commit 89f2837, "feat(prolance-ms-thermo): ingest .raw directly via
+    /// opentfraw iter_spectra", through origin/main) parse to the activation
+    /// they were written for.
     #[test]
-    fn non_activation_terms_do_not_parse() {
-        assert_eq!(
-            parse_activation("in-source collision-induced dissociation"),
-            None
-        );
-        assert_eq!(
-            parse_activation("supplemental beam-type collision-induced dissociation"),
-            None
-        );
+    fn legacy_vendor_names_parse_to_the_intended_activation() {
+        let written = [
+            (A::CID, "collision-induced dissociation"),
+            (A::HCD, "beam-type collision-induced dissociation"),
+            (A::ETD, "electron transfer dissociation"),
+            (A::EThcD, "electron transfer dissociation"),
+            (
+                A::MPID,
+                "supplemental beam-type collision-induced dissociation",
+            ),
+            (A::ECD, "electron capture dissociation"),
+            (A::IRMPD, "infrared multiphoton dissociation"),
+            (A::PD, "in-source collision-induced dissociation"),
+            (A::PQD, "pulsed q dissociation"),
+            (A::UVPD, "ultraviolet photodissociation"),
+            (A::SID, "beam-type collision-induced dissociation"),
+        ];
+        for (act, name) in written {
+            let got = parse_activation(name).unwrap();
+            let want = match act {
+                A::EThcD => A::ETD,
+                A::SID => A::HCD,
+                other => other,
+            };
+            assert_eq!(got, want, "{name}");
+        }
+        for (name, act) in LEGACY_VENDOR_NAMES {
+            assert_eq!(parse_activation(name), Some(act), "{name}");
+        }
+    }
+
+    #[test]
+    fn unknown_names_do_not_parse() {
         assert_eq!(parse_activation("flux capacitor"), None);
     }
 

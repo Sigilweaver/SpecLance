@@ -337,7 +337,10 @@ precision of the original storage width.
 ## Known issues
 
 - mzML activation roundtrip is lossy in these cases, all from `openmassspec-core` 3.0.0:
-  - `PD` has no PSI-MS term, so core writes no activation for it; the writer returns `MsError::Unsupported`.
+  - `PD` cannot be written until SpecLance moves to an `openmassspec-core` release that writes it; the writer returns
+    `MsError::Unsupported`.
+  - Stores ingested by the vendor path hold long activation names. `SID` and `HCD` share one name and read as `HCD`;
+    `EThcD` and `ETD` share one name and read as `ETD`.
   - `HCD` is written as `MS:1000422` (beam-type CID), so a file read with `MS:1002481` (higher energy beam-type CID)
     is written back with its parent term.
   - `MPD` and `MPID` both map to `MS:1000435` (photodissociation) and read back as `MPID`.

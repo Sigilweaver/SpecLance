@@ -141,7 +141,9 @@ and PyPI.
   activation name has no mzML term, when the activation is `PD` (core writes no
   term for it), or when a spectrum has an activation but no precursor. The
   writer parses the short names the store holds (`CID`, `HCD`, `ETD`, `EThcD`,
-  `MPID`, `MPD`, ...), so every activation the reader emits can be written back.
+  `MPID`, `MPD`, ...) and the long names the vendor ingest wrote into existing
+  stores, so every activation the reader emits and every existing store can be
+  written back.
 - The mzML reader used wrong accessions for activation. `MS:1002481` (higher
   energy beam-type CID) now reads as `HCD` instead of `MPID`, `MS:1000435`
   (photodissociation) reads as `MPID` instead of `MPD`, and `MS:1001880`
