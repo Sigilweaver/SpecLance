@@ -92,6 +92,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Security
 
+- Updated the locked `opentimstdf` (via `openmassspec-io`) from 3.0.0 to
+  3.0.1, which moves `rusqlite` to 0.42 and `libsqlite3-sys` to 0.40.0,
+  fixing RUSTSEC-2026-0459 (C SQLite CVE-2026-119375). Lockfile-only change.
 - Updated the transitive `zstd` 0.13.4, `zstd-safe` 7.4.0 and `zstd-sys`
   2.1.2 (via `arrow-ipc` and `lance-encoding`) in the lockfile, fixing
   RUSTSEC-2026-0391, RUSTSEC-2026-0398, RUSTSEC-2026-0403 and
