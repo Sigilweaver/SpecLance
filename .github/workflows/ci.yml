@@ -104,7 +104,6 @@ jobs:
   python:
     name: Python bindings (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -164,6 +163,12 @@ jobs:
       - name: Build wheel
         working-directory: SpecLance/crates/speclance-py
         run: maturin build --release --interpreter python3 --out dist
+        env:
+          # PR checks only need a wheel that imports and passes pytest. Fat LTO
+          # with one codegen unit takes hours on the macOS runner, so build
+          # this wheel without LTO. release.yml keeps [profile.release].
+          CARGO_PROFILE_RELEASE_LTO: "off"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
 
       - name: Install wheel
         working-directory: SpecLance/crates/speclance-py
