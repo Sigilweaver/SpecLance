@@ -57,6 +57,35 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   and test pass on Linux; the macOS/Windows runs have not been
   observed in Actions yet.
 
+
+### Fixed
+
+- The mzML reader no longer drops character references (for example `&#10;`)
+  and CDATA sections inside `<binary>` elements; they are now part of the
+  base64 text, and whitespace in the base64 is ignored when decoding. An
+  unknown entity reference returns `MsError::Xml`.
+- Writing mzML now returns `MsError::Unsupported` (naming the spectrum and the
+  activation) instead of silently omitting the activation when a precursor's
+  activation name has no mzML term, when the activation is `PD` (core writes no
+  term for it), or when a spectrum has an activation but no precursor. The
+  writer parses the short names the store holds (`CID`, `HCD`, `ETD`, `EThcD`,
+  `MPID`, `MPD`, ...) and the long names the vendor ingest wrote into existing
+  stores, so every activation the reader emits and every existing store can be
+  written back.
+- The mzML reader used wrong accessions for activation. `MS:1002481` (higher
+  energy beam-type CID) now reads as `HCD` instead of `MPID`, `MS:1000435`
+  (photodissociation) reads as `MPID` instead of `MPD`, and `MS:1001880`
+  (in-source CID) is no longer read as `PD`. It now also reads `MS:1002631`
+  (EThcD), `MS:1000136` (SID), and ETD with `MS:1002631` or `MS:1002678` as
+  `EThcD`.
+- When an `<activation>` block holds several dissociation terms, the reader no
+  longer lets the last one overwrite the others: the first primary term sets
+  the name and the rest stay in the spectrum's `cv_params`, as does any
+  unrecognised term.
+- Vendor ingest stores short activation names (`SID`, `MPID` and `EThcD`
+  included) instead of mzML term names, so they are no longer written as
+  `HCD` or `ETD`.
+
 ### Security
 
 - Updated the transitive `zstd` 0.13.4, `zstd-safe` 7.4.0 and `zstd-sys`
@@ -132,31 +161,6 @@ and PyPI.
 
 ### Fixed
 
-- The mzML reader no longer drops character references (for example `&#10;`)
-  and CDATA sections inside `<binary>` elements; they are now part of the
-  base64 text, and whitespace in the base64 is ignored when decoding. An
-  unknown entity reference returns `MsError::Xml`.
-- Writing mzML now returns `MsError::Unsupported` (naming the spectrum and the
-  activation) instead of silently omitting the activation when a precursor's
-  activation name has no mzML term, when the activation is `PD` (core writes no
-  term for it), or when a spectrum has an activation but no precursor. The
-  writer parses the short names the store holds (`CID`, `HCD`, `ETD`, `EThcD`,
-  `MPID`, `MPD`, ...) and the long names the vendor ingest wrote into existing
-  stores, so every activation the reader emits and every existing store can be
-  written back.
-- The mzML reader used wrong accessions for activation. `MS:1002481` (higher
-  energy beam-type CID) now reads as `HCD` instead of `MPID`, `MS:1000435`
-  (photodissociation) reads as `MPID` instead of `MPD`, and `MS:1001880`
-  (in-source CID) is no longer read as `PD`. It now also reads `MS:1002631`
-  (EThcD), `MS:1000136` (SID), and ETD with `MS:1002631` or `MS:1002678` as
-  `EThcD`.
-- When an `<activation>` block holds several dissociation terms, the reader no
-  longer lets the last one overwrite the others: the first primary term sets
-  the name and the rest stay in the spectrum's `cv_params`, as does any
-  unrecognised term.
-- Vendor ingest stores short activation names (`SID`, `MPID` and `EThcD`
-  included) instead of mzML term names, so they are no longer written as
-  `HCD` or `ETD`.
 - References to the old `OpenTDF` name updated to `OpenTimsTDF`
   across CI, manifests, README, and tests.
 

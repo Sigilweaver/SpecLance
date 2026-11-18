@@ -336,13 +336,15 @@ precision of the original storage width.
 
 ## Known issues
 
-- mzML activation roundtrip is lossy in these cases, all from `openmassspec-core` 3.0.0:
-  - `PD` cannot be written until SpecLance moves to an `openmassspec-core` release that writes it; the writer returns
-    `MsError::Unsupported`.
-  - Stores ingested by the vendor path hold long activation names. `SID` and `HCD` share one name and read as `HCD`;
-    `EThcD` and `ETD` share one name and read as `ETD`.
-  - `HCD` is written as `MS:1000422` (beam-type CID), so a file read with `MS:1002481` (higher energy beam-type CID)
-    is written back with its parent term.
+- mzML activation roundtrip is lossy in these cases:
+  - `PD` cannot be written until SpecLance moves to an `openmassspec-core` release that writes it (3.0.0 writes no
+    term for it); the writer returns `MsError::Unsupported`.
+  - Stores ingested through the vendor path before short names were stored hold long activation names. `SID` and
+    `HCD` share one long name and read as `HCD`; `EThcD` and `ETD` share one and read as `ETD`.
+  - `HCD` is written as `MS:1000422` (beam-type CID), so a file read with `MS:1002481` (higher energy beam-type CID),
+    alone or together with `MS:1000422`, is written back with `MS:1000422` only.
+  - ETD with `MS:1002678` (supplemental beam-type CID) reads as `EThcD` and is written back as ETD with `MS:1002631`
+    (EThcD).
   - `MPD` and `MPID` both map to `MS:1000435` (photodissociation) and read back as `MPID`.
   - `CID` is written as `MS:1000133`; the supplemental terms `MS:1002678` and `MS:1002679` and any other activation
     term are kept in `cv_params` on read and are not written back.
