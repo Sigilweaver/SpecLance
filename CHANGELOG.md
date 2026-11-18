@@ -8,6 +8,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Release builds use thin LTO (`lto = "thin"`, `codegen-units = 1`). On a
+  20,000-spectrum mzML benchmark the Python wheel's runtime is within 2% of fat
+  LTO (inside run-to-run spread), the wheel is 2% larger, and the final crate
+  builds in less than half the time.
 - Updated `quick-xml` from 0.41.0 to 0.42.0. mzML text that cannot be
   unescaped now returns `MsError::Xml` instead of being read as an empty
   string, and element names and attribute keys are no longer converted

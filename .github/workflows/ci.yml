@@ -108,9 +108,9 @@ jobs:
         working-directory: crates/speclance-py
         run: maturin build --release --interpreter python3 --out dist
         env:
-          # PR checks only need a wheel that imports and passes pytest. Fat LTO
-          # with one codegen unit takes hours on the macOS runner, so build
-          # this wheel without LTO. release.yml keeps [profile.release].
+          # PR checks only need a wheel that imports and passes pytest, so
+          # build it without LTO to keep the macOS runner fast. release.yml
+          # uses [profile.release] as is.
           CARGO_PROFILE_RELEASE_LTO: "off"
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
 
