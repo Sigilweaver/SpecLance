@@ -137,7 +137,7 @@ fn record_to_spectrum(run_id: &str, rec: &SpectrumRecord) -> Spectrum {
         .precursor
         .as_ref()
         .and_then(|p| p.activation)
-        .map(activation_name);
+        .map(crate::activation::activation_label);
 
     // `ce_is_nce` flips the unit; SpecLance's column is just an f32, so we drop
     // normalized values rather than report them in the wrong unit.
@@ -175,24 +175,6 @@ fn record_to_spectrum(run_id: &str, rec: &SpectrumRecord) -> Spectrum {
         mz: rec.mz.clone(),
         intensity: rec.intensity.clone(),
         cv_params: None,
-    }
-}
-
-fn activation_name(act: openmassspec_io::core::Activation) -> String {
-    use openmassspec_io::core::Activation as A;
-    match act {
-        A::CID => "collision-induced dissociation".to_string(),
-        A::HCD => "beam-type collision-induced dissociation".to_string(),
-        A::ETD | A::EThcD => "electron transfer dissociation".to_string(),
-        A::MPID => "supplemental beam-type collision-induced dissociation".to_string(),
-        A::ECD => "electron capture dissociation".to_string(),
-        A::IRMPD => "infrared multiphoton dissociation".to_string(),
-        A::PD => "in-source collision-induced dissociation".to_string(),
-        A::PQD => "pulsed q dissociation".to_string(),
-        A::UVPD => "ultraviolet photodissociation".to_string(),
-        A::SID => "beam-type collision-induced dissociation".to_string(),
-        // `Activation` is #[non_exhaustive]: keep the variant name for new ones.
-        other => format!("{other:?}"),
     }
 }
 
