@@ -165,3 +165,114 @@ fn streaming_ingest_matches_parse_bytes() {
         assert_eq!(a.rt, b.rt);
     }
 }
+
+const MZ_B64: &str = "AAAAAAAAREAAAAAAAABJQAAAAAAAAFBA";
+
+fn tiny_with_mz_binary(body: &str) -> Vec<u8> {
+    TINY_MZML
+        .replace(
+            &format!("<binary>{MZ_B64}</binary>"),
+            &format!("<binary>{body}</binary>"),
+        )
+        .into_bytes()
+}
+
+fn assert_tiny_mz(data: &speclance_ms::mzml::MzmlData) {
+    assert_eq!(data.spectra[0].mz, vec![40.0, 50.0, 64.0]);
+}
+
+#[test]
+fn base64_with_char_refs_is_decoded() {
+    let body = format!(
+        "{}&#10;{}&#x20;{}",
+        &MZ_B64[..8],
+        &MZ_B64[8..20],
+        &MZ_B64[20..]
+    );
+    let data = parse_bytes(&tiny_with_mz_binary(&body), "ref.mzML".into()).unwrap();
+    assert_tiny_mz(&data);
+}
+
+#[test]
+fn base64_in_cdata_is_decoded() {
+    let body = format!("<![CDATA[{}]]>", MZ_B64);
+    let data = parse_bytes(&tiny_with_mz_binary(&body), "cdata.mzML".into()).unwrap();
+    assert_tiny_mz(&data);
+}
+
+#[test]
+fn base64_split_across_text_and_cdata_is_decoded() {
+    let body = format!("{}<![CDATA[{}]]>", &MZ_B64[..12], &MZ_B64[12..]);
+    let data = parse_bytes(&tiny_with_mz_binary(&body), "mixed.mzML".into()).unwrap();
+    assert_tiny_mz(&data);
+}
+
+#[test]
+fn unknown_entity_in_binary_is_an_xml_error() {
+    let body = format!("{}&bogus;{}", &MZ_B64[..8], &MZ_B64[8..]);
+    let err = parse_bytes(&tiny_with_mz_binary(&body), "bad.mzML".into()).unwrap_err();
+    assert!(matches!(err, speclance_ms::MsError::Xml(_)), "{err:?}");
+}
+
+#[test]
+fn predefined_entities_in_binary_are_resolved() {
+    // Each predefined entity resolves to a character that is not valid
+    // base64, so the failure is a decode error rather than an unknown
+    // entity (MsError::Xml) or silently dropped text.
+    for ent in ["amp", "lt", "gt", "apos", "quot"] {
+        let body = format!("{}&{ent};{}", &MZ_B64[..8], &MZ_B64[8..]);
+        let err = parse_bytes(&tiny_with_mz_binary(&body), "ent.mzML".into()).unwrap_err();
+        assert!(
+            matches!(err, speclance_ms::MsError::Base64(_)),
+            "{ent}: {err:?}"
+        );
+    }
+}
+
+const INT_B64: &str = "AABAQAAAoEAAAPBA";
+
+fn tiny_with_chromatogram(time_body: &str) -> Vec<u8> {
+    let chrom = format!(
+        r#"<chromatogramList count="1"><chromatogram index="0" id="TIC" defaultArrayLength="3">
+<cvParam cvRef="MS" accession="MS:1000235" name="total ion current chromatogram"/>
+<binaryDataArrayList count="2">
+<binaryDataArray encodedLength="32"><cvParam cvRef="MS" accession="MS:1000523" name="64-bit float"/><cvParam cvRef="MS" accession="MS:1000576" name="no compression"/><cvParam cvRef="MS" accession="MS:1000595" name="time array"/><binary>{time_body}</binary></binaryDataArray>
+<binaryDataArray encodedLength="16"><cvParam cvRef="MS" accession="MS:1000521" name="32-bit float"/><cvParam cvRef="MS" accession="MS:1000576" name="no compression"/><cvParam cvRef="MS" accession="MS:1000515" name="intensity array"/><binary>{INT_B64}</binary></binaryDataArray>
+</binaryDataArrayList></chromatogram></chromatogramList>
+"#
+    );
+    TINY_MZML
+        .replace("  </run>", &format!("{chrom}  </run>"))
+        .into_bytes()
+}
+
+fn assert_tiny_chrom(data: &speclance_ms::mzml::MzmlData) {
+    assert_eq!(data.chromatograms.len(), 1);
+    assert_eq!(data.chromatograms[0].time, vec![40.0, 50.0, 64.0]);
+    assert_eq!(data.chromatograms[0].intensity, vec![3.0, 5.0, 7.5]);
+}
+
+#[test]
+fn chromatogram_base64_plain_is_decoded() {
+    let data = parse_bytes(&tiny_with_chromatogram(MZ_B64), "chrom.mzML".into()).unwrap();
+    assert_tiny_chrom(&data);
+}
+
+#[test]
+fn chromatogram_base64_with_char_refs_and_cdata_is_decoded() {
+    let body = format!(
+        "{}&#10;{}&#x20;<![CDATA[{}]]>",
+        &MZ_B64[..8],
+        &MZ_B64[8..20],
+        &MZ_B64[20..]
+    );
+    let data = parse_bytes(&tiny_with_chromatogram(&body), "chrom-ref.mzML".into()).unwrap();
+    assert_tiny_chrom(&data);
+}
+
+#[test]
+fn chromatogram_unknown_entity_is_an_xml_error() {
+    let body = format!("{}&bogus;{}", &MZ_B64[..8], &MZ_B64[8..]);
+    let err = parse_bytes(&tiny_with_chromatogram(&body), "bad.mzML".into()).unwrap_err();
+    assert!(matches!(err, speclance_ms::MsError::Xml(_)), "{err:?}");
+}

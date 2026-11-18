@@ -132,6 +132,10 @@ and PyPI.
 
 ### Fixed
 
+- The mzML reader no longer drops character references (for example `&#10;`)
+  and CDATA sections inside `<binary>` elements; they are now part of the
+  base64 text, and whitespace in the base64 is ignored when decoding. An
+  unknown entity reference returns `MsError::Xml`.
 - References to the old `OpenTDF` name updated to `OpenTimsTDF`
   across CI, manifests, README, and tests.
 
