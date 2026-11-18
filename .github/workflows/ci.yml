@@ -28,37 +28,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - name: Checkout SpecLance
+      - name: Checkout
         uses: actions/checkout@v7
-        with:
-          path: SpecLance
-
-      # Vendor crates are sibling path dependencies. They must be present
-      # for cargo to resolve the workspace, even when vendor features are
-      # disabled. CI checks out each sibling repo from the same owner.
-      - name: Checkout OpenTFRaw
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenTFRaw
-          path: OpenTFRaw
-
-      - name: Checkout OpenTimsTDF
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenTimsTDF
-          path: OpenTimsTDF
-
-      - name: Checkout OpenWRaw
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenWRaw
-          path: OpenWRaw
-
-      - name: Checkout OpenMassSpec
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenMassSpec
-          path: OpenMassSpec
 
       # Cross-platform protoc install (apt-get is Linux-only; this action
       # covers the macOS/Windows runners added alongside the wheel matrix).
@@ -76,30 +47,29 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: SpecLance
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-on-failure: true
 
       - name: cargo fmt
-        working-directory: SpecLance
+        if: matrix.os == 'ubuntu-latest'
         run: cargo fmt --all -- --check
 
       - name: cargo clippy (default features)
-        working-directory: SpecLance
+        if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: cargo clippy (all vendor features)
-        working-directory: SpecLance
+        if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --workspace --all-targets --features all-vendors -- -D warnings
 
-      - name: cargo test (default features)
-        working-directory: SpecLance
-        run: cargo test --workspace --all-targets
+      # all-vendors enables the same openmassspec-io/all set as the former
+      # `--features thermo` step, so one compile covers the default tests and
+      # the vendor adapter tests (thermo, bruker, waters).
+      - name: cargo test (all vendor features)
+        run: cargo test --workspace --all-targets --features all-vendors
         env:
           # Skip corpus-dependent tests in CI; they no-op when the path is absent.
           SPECLANCE_RUN_CORPUS_TESTS: "0"
-
-      - name: cargo test (thermo feature)
-        working-directory: SpecLance
-        run: cargo test -p speclance-ms --features thermo --test thermo_adapter
 
   python:
     name: Python bindings (${{ matrix.os }})
@@ -109,34 +79,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - name: Checkout SpecLance
+      - name: Checkout
         uses: actions/checkout@v7
-        with:
-          path: SpecLance
-
-      - name: Checkout OpenTFRaw
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenTFRaw
-          path: OpenTFRaw
-
-      - name: Checkout OpenTimsTDF
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenTimsTDF
-          path: OpenTimsTDF
-
-      - name: Checkout OpenWRaw
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenWRaw
-          path: OpenWRaw
-
-      - name: Checkout OpenMassSpec
-        uses: actions/checkout@v7
-        with:
-          repository: Sigilweaver/OpenMassSpec
-          path: OpenMassSpec
 
       - name: Install protoc
         uses: arduino/setup-protoc@v3
@@ -150,7 +94,8 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: SpecLance
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-on-failure: true
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -161,7 +106,7 @@ jobs:
         run: python -m pip install --upgrade pip maturin pytest
 
       - name: Build wheel
-        working-directory: SpecLance/crates/speclance-py
+        working-directory: crates/speclance-py
         run: maturin build --release --interpreter python3 --out dist
         env:
           # PR checks only need a wheel that imports and passes pytest. Fat LTO
@@ -171,7 +116,7 @@ jobs:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
 
       - name: Install wheel
-        working-directory: SpecLance/crates/speclance-py
+        working-directory: crates/speclance-py
         # bash for glob expansion of dist/speclance-*.whl - pwsh (the default
         # shell on windows-latest) does not expand wildcards for external
         # command arguments the way bash does.
@@ -179,5 +124,5 @@ jobs:
         run: pip install --force-reinstall dist/speclance-*.whl
 
       - name: pytest
-        working-directory: SpecLance/crates/speclance-py
+        working-directory: crates/speclance-py
         run: pytest tests/ -q
