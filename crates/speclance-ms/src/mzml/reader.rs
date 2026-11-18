@@ -21,7 +21,6 @@
 //! reassemble a byte-identical document outside the spectrum and
 //! chromatogram lists.
 
-use std::borrow::Cow;
 use std::io::Read as _;
 use std::path::Path;
 
@@ -412,11 +411,7 @@ fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
             }
             Event::Text(t) if stack.last().map(|s| s.as_str()) == Some("binary") => {
                 if let Some(state) = current_binary.as_mut() {
-                    let txt = t
-                        .decode()
-                        .ok()
-                        .and_then(|d| quick_xml::escape::unescape(&d).ok().map(Cow::into_owned))
-                        .unwrap_or_default();
+                    let txt = quick_xml::escape::unescape(&t.xml10_content())?.into_owned();
                     state.base64.push_str(txt.trim());
                 }
             }
@@ -794,8 +789,8 @@ fn decode_floats_f32(bytes: &[u8], precision: u8) -> MsResult<Vec<f32>> {
     }
 }
 
-fn bytes_to_string(b: &[u8]) -> String {
-    String::from_utf8_lossy(b).into_owned()
+fn bytes_to_string(b: &str) -> String {
+    b.to_owned()
 }
 
 // -- chromatograms --
@@ -835,7 +830,7 @@ fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
                 if name == "chromatogram" {
                     for attr in e.attributes() {
                         let attr = attr?;
-                        if attr.key.as_ref() == b"id" {
+                        if attr.key.as_ref() == "id" {
                             chrom.chrom_id = attr
                                 .normalized_value(quick_xml::XmlVersion::Implicit1_0)?
                                 .to_string();
@@ -900,11 +895,7 @@ fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
             }
             Event::Text(t) if stack.last().map(|s| s.as_str()) == Some("binary") => {
                 if let Some(b) = current_binary.as_mut() {
-                    let txt = t
-                        .decode()
-                        .ok()
-                        .and_then(|d| quick_xml::escape::unescape(&d).ok().map(Cow::into_owned))
-                        .unwrap_or_default();
+                    let txt = quick_xml::escape::unescape(&t.xml10_content())?.into_owned();
                     b.base64.push_str(txt.trim());
                 }
             }
