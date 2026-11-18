@@ -8,6 +8,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Updated `quick-xml` from 0.41.0 to 0.42.0. mzML text that cannot be
+  unescaped now returns `MsError::Xml` instead of being read as an empty
+  string, and mzML that is not UTF-8 is rejected.
 - Updated `lancedb` from 0.31.0 to 0.41.0 (Lance 8 -> 14, DataFusion 53 ->
   54). 0.40.0 was skipped because it does not compile without lancedb's
   `remote` feature. No SpecLance source changes were needed and store
