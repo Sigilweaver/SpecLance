@@ -62,9 +62,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --workspace --all-targets --features all-vendors -- -D warnings
 
-      # all-vendors enables the same openmassspec-io/all set as the former
-      # `--features thermo` step, so one compile covers the default tests and
-      # the vendor adapter tests (thermo, bruker, waters).
+      # all-vendors enables openmassspec-io/all, so one compile covers the
+      # default tests and the vendor adapter tests (thermo, bruker, waters).
       - name: cargo test (all vendor features)
         run: cargo test --workspace --all-targets --features all-vendors
         env:
