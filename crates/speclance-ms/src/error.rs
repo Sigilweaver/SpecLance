@@ -38,6 +38,12 @@ impl From<quick_xml::events::attributes::AttrError> for MsError {
     }
 }
 
+impl From<quick_xml::escape::EscapeError> for MsError {
+    fn from(e: quick_xml::escape::EscapeError) -> Self {
+        MsError::Xml(e.to_string())
+    }
+}
+
 impl From<base64::DecodeError> for MsError {
     fn from(e: base64::DecodeError) -> Self {
         MsError::Base64(e.to_string())
