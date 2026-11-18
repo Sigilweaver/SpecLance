@@ -4,6 +4,7 @@
 //! ([`vendor`]) that drives [`openmassspec_io`] - no direct vendor-crate
 //! dependencies live here.
 
+pub(crate) mod activation;
 pub mod error;
 pub mod mzml;
 

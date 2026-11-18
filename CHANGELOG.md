@@ -136,6 +136,17 @@ and PyPI.
   and CDATA sections inside `<binary>` elements; they are now part of the
   base64 text, and whitespace in the base64 is ignored when decoding. An
   unknown entity reference returns `MsError::Xml`.
+- Writing mzML now returns `MsError::Unsupported` (naming the spectrum and the
+  activation) when a precursor's activation name has no mzML activation term,
+  instead of silently omitting the activation. The writer parses the short
+  names the store holds (`CID`, `HCD`, `ETD`, `PQD`, `MPD`, ...), so reading an
+  mzML file and writing it back works for every activation the reader emits.
+- The mzML reader maps the activation terms the writer emits (ECD, IRMPD, PD,
+  MPID, UVPD) to their short names, and keeps any activation term it does not
+  recognise in the spectrum's `cv_params`.
+- Vendor ingest stores short activation names (`SID`, `MPID` and `EThcD`
+  included) instead of mzML term names, so they are no longer written as
+  `HCD` or `ETD`.
 - References to the old `OpenTDF` name updated to `OpenTimsTDF`
   across CI, manifests, README, and tests.
 

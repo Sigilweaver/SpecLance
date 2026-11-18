@@ -334,6 +334,12 @@ The test suite will parse the exported mzML with an independent parser
 retention times, precursor values, and peak arrays to within floating-point
 precision of the original storage width.
 
+## Known issues
+
+- mzML export maps activations to the terms `openmassspec-io` can write: `SID` is written as beam-type collision-induced
+  dissociation, `EThcD` as electron transfer dissociation, `MPID` as supplemental beam-type collision-induced
+  dissociation, and `MPD` (mzML photodissociation) as infrared multiphoton dissociation.
+
 ## Dependency Map
 
 ```

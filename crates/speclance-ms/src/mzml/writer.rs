@@ -38,7 +38,7 @@ pub fn write_mzml<W: Write>(
         .iter()
         .enumerate()
         .map(|(idx, s)| spectrum_to_record(idx, s))
-        .collect();
+        .collect::<MsResult<_>>()?;
 
     let mut src = VecSource::new(metadata, records);
     openmassspec_io::core::write_mzml(&mut src, out)
@@ -97,7 +97,7 @@ fn instrument_term(name: Option<&str>) -> CvTerm {
     CvTerm::new("MS:1000031", name.unwrap_or("instrument model").to_string())
 }
 
-fn spectrum_to_record(idx: usize, s: &Spectrum) -> SpectrumRecord {
+fn spectrum_to_record(idx: usize, s: &Spectrum) -> MsResult<SpectrumRecord> {
     let polarity = match s.polarity {
         Some(1) => Some(Polarity::Positive),
         Some(-1) => Some(Polarity::Negative),
@@ -116,7 +116,20 @@ fn spectrum_to_record(idx: usize, s: &Spectrum) -> SpectrumRecord {
         .clone()
         .unwrap_or_else(|| format!("scan={}", s.scan_num));
 
-    let precursor = s.precursor.as_ref().map(|p| precursor_to_info(p, s));
+    if s.precursor.is_none() {
+        if let Some(name) = s.activation.as_deref() {
+            return Err(MsError::Unsupported(format!(
+                "spectrum {idx} (scan {}): activation {name:?} has no precursor to attach to; \
+                 refusing to write the spectrum without it",
+                s.scan_num
+            )));
+        }
+    }
+    let precursor = s
+        .precursor
+        .as_ref()
+        .map(|p| precursor_to_info(idx, p, s))
+        .transpose()?;
 
     // SpecLance has no FAIMS ingest path on any vendor adapter today, so
     // `faims_cv`, `analyzer`, `filter`, `acquisition_event_id`,
@@ -134,16 +147,38 @@ fn spectrum_to_record(idx: usize, s: &Spectrum) -> SpectrumRecord {
     rec.high_mz = s.scan_window_upper;
     rec.inv_mobility = s.inv_mobility;
     rec.precursor = precursor;
-    rec
+    Ok(rec)
 }
 
-fn precursor_to_info(p: &speclance_core::Precursor, s: &Spectrum) -> PrecursorInfo {
+fn precursor_to_info(
+    idx: usize,
+    p: &speclance_core::Precursor,
+    s: &Spectrum,
+) -> MsResult<PrecursorInfo> {
     // SpecLance stores symmetric lower/upper half-widths around the target.
     // Restore the full width when both are present.
     let isolation_width = match (p.isolation_window_lower, p.isolation_window_upper) {
         (Some(lo), Some(hi)) => Some(lo + hi),
         _ => None,
     };
+    let activation = match s.activation.as_deref() {
+        Some(name) => Some(crate::activation::parse_activation(name).ok_or_else(|| {
+            MsError::Unsupported(format!(
+                "spectrum {idx} (scan {}): activation {name:?} has no mzML activation term; \
+                 refusing to write the spectrum without it",
+                s.scan_num
+            ))
+        })?),
+        None => None,
+    };
+    if activation == Some(openmassspec_io::core::Activation::PD) {
+        return Err(MsError::Unsupported(format!(
+            "spectrum {idx} (scan {}): activation \"PD\" has no PSI-MS term, so \
+             openmassspec-core writes no activation for it; refusing to write the \
+             spectrum without it",
+            s.scan_num
+        )));
+    }
     let mut info = PrecursorInfo::default();
     info.target_mz = p.isolation_window_target;
     info.selected_mz = p.mz;
@@ -152,30 +187,75 @@ fn precursor_to_info(p: &speclance_core::Precursor, s: &Spectrum) -> PrecursorIn
     info.intensity = p.intensity;
     info.collision_energy = s.collision_energy.map(|e| e as f64);
     info.ce_is_nce = false;
-    info.activation = s.activation.as_deref().and_then(parse_activation);
-    info
+    info.activation = activation;
+    Ok(info)
 }
 
-fn parse_activation(name: &str) -> Option<openmassspec_io::core::Activation> {
-    use openmassspec_io::core::Activation as A;
-    let n = name.to_ascii_lowercase();
-    if n.contains("electron transfer") {
-        Some(A::ETD)
-    } else if n.contains("electron capture") {
-        Some(A::ECD)
-    } else if n.contains("beam-type") {
-        Some(A::HCD)
-    } else if n.contains("collision-induced") {
-        Some(A::CID)
-    } else if n.contains("infrared multiphoton") {
-        Some(A::IRMPD)
-    } else if n.contains("ultraviolet") {
-        Some(A::UVPD)
-    } else if n.contains("pulsed q") {
-        Some(A::PQD)
-    } else if n.contains("in-source") {
-        Some(A::PD)
-    } else {
-        None
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use speclance_core::Precursor;
+
+    fn ms2(activation: Option<&str>) -> Spectrum {
+        Spectrum {
+            scan_num: 7,
+            ms_level: 2,
+            precursor: Some(Precursor {
+                mz: Some(500.0),
+                ..Default::default()
+            }),
+            activation: activation.map(str::to_string),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn known_activation_is_written() {
+        let rec =
+            spectrum_to_record(0, &ms2(Some("beam-type collision-induced dissociation"))).unwrap();
+        assert_eq!(
+            rec.precursor.unwrap().activation,
+            Some(openmassspec_io::core::Activation::HCD)
+        );
+    }
+
+    #[test]
+    fn unrecognised_activation_is_an_error() {
+        let err = spectrum_to_record(3, &ms2(Some("flux capacitor"))).unwrap_err();
+        let msg = err.to_string();
+        assert!(matches!(err, MsError::Unsupported(_)));
+        assert!(
+            msg.contains("flux capacitor") && msg.contains("spectrum 3"),
+            "{msg}"
+        );
+    }
+
+    #[test]
+    fn write_mzml_rejects_unrecognised_activation() {
+        let run = Run::default();
+        let mut buf = Vec::new();
+        let r = write_mzml(&mut buf, &run, &[ms2(Some("flux capacitor"))], &[]);
+        assert!(matches!(r, Err(MsError::Unsupported(_))));
+    }
+
+    #[test]
+    fn activation_without_precursor_is_an_error() {
+        let mut sp = ms2(Some("HCD"));
+        sp.precursor = None;
+        let err = spectrum_to_record(5, &sp).unwrap_err();
+        let msg = err.to_string();
+        assert!(matches!(err, MsError::Unsupported(_)));
+        assert!(msg.contains("HCD") && msg.contains("spectrum 5"), "{msg}");
+    }
+
+    #[test]
+    fn pd_is_an_error_because_core_writes_no_term_for_it() {
+        let err = spectrum_to_record(2, &ms2(Some("PD"))).unwrap_err();
+        assert!(matches!(err, MsError::Unsupported(_)), "{err:?}");
+    }
+
+    #[test]
+    fn absent_activation_is_not_an_error() {
+        assert!(spectrum_to_record(0, &ms2(None)).is_ok());
     }
 }

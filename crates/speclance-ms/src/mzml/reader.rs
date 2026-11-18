@@ -433,10 +433,41 @@ fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
     if have_precursor {
         spec.precursor = Some(precursor);
     }
+    resolve_activation_terms(&mut spec, &mut extra_cv);
     if !extra_cv.is_empty() {
         spec.cv_params = Some(serde_json::to_string(&extra_cv)?);
     }
     Ok(spec)
+}
+
+/// Set `spec.activation` from the `<activation>` cvParams collected in `extra`,
+/// removing the ones the name accounts for. The rest stay in `extra`, so no
+/// activation term is dropped.
+fn resolve_activation_terms(spec: &mut Spectrum, extra: &mut Vec<CvParam>) {
+    let idx: Vec<usize> = extra
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.section == "activation" && c.kind == "cv")
+        .map(|(i, _)| i)
+        .collect();
+    let accs: Vec<&str> = idx
+        .iter()
+        .map(|&i| extra[i].accession.as_deref().unwrap_or(""))
+        .collect();
+    let (name, used) = crate::activation::resolve_activation(&accs);
+    spec.activation = name.map(str::to_string);
+    let drop: Vec<usize> = idx
+        .iter()
+        .zip(used)
+        .filter(|(_, u)| *u)
+        .map(|(&i, _)| i)
+        .collect();
+    let mut i = 0;
+    extra.retain(|_| {
+        let keep = !drop.contains(&i);
+        i += 1;
+        keep
+    });
 }
 
 fn parse_spectrum_attrs(e: &BytesStart, spec: &mut Spectrum) -> MsResult<()> {
@@ -627,11 +658,6 @@ fn apply_cv_to_spectrum(
     if context == "activation" {
         *have_precursor = true;
         match acc {
-            "MS:1000133" => spec.activation = Some("CID".into()),
-            "MS:1000422" => spec.activation = Some("HCD".into()),
-            "MS:1000598" => spec.activation = Some("ETD".into()),
-            "MS:1000599" => spec.activation = Some("PQD".into()),
-            "MS:1000435" => spec.activation = Some("MPD".into()),
             "MS:1000045" => {
                 spec.collision_energy = val.and_then(|s| s.parse().ok());
             }
