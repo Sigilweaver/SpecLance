@@ -336,9 +336,14 @@ precision of the original storage width.
 
 ## Known issues
 
-- mzML export maps activations to the terms `openmassspec-io` can write: `SID` is written as beam-type collision-induced
-  dissociation, `EThcD` as electron transfer dissociation, `MPID` as supplemental beam-type collision-induced
-  dissociation, and `MPD` (mzML photodissociation) as infrared multiphoton dissociation.
+- mzML activation roundtrip is lossy in these cases, all from `openmassspec-core` 3.0.0:
+  - `PD` has no PSI-MS term, so core writes no activation for it; the writer returns `MsError::Unsupported`.
+  - `HCD` is written as `MS:1000422` (beam-type CID), so a file read with `MS:1002481` (higher energy beam-type CID)
+    is written back with its parent term.
+  - `MPD` and `MPID` both map to `MS:1000435` (photodissociation) and read back as `MPID`.
+  - `CID` is written as `MS:1000133`; the supplemental terms `MS:1002678` and `MS:1002679` and any other activation
+    term are kept in `cv_params` on read and are not written back.
+  - A spectrum with an activation but no precursor cannot be written (`MsError::Unsupported`).
 
 ## Dependency Map
 

@@ -137,13 +137,21 @@ and PyPI.
   base64 text, and whitespace in the base64 is ignored when decoding. An
   unknown entity reference returns `MsError::Xml`.
 - Writing mzML now returns `MsError::Unsupported` (naming the spectrum and the
-  activation) when a precursor's activation name has no mzML activation term,
-  instead of silently omitting the activation. The writer parses the short
-  names the store holds (`CID`, `HCD`, `ETD`, `PQD`, `MPD`, ...), so reading an
-  mzML file and writing it back works for every activation the reader emits.
-- The mzML reader maps the activation terms the writer emits (ECD, IRMPD, PD,
-  MPID, UVPD) to their short names, and keeps any activation term it does not
-  recognise in the spectrum's `cv_params`.
+  activation) instead of silently omitting the activation when a precursor's
+  activation name has no mzML term, when the activation is `PD` (core writes no
+  term for it), or when a spectrum has an activation but no precursor. The
+  writer parses the short names the store holds (`CID`, `HCD`, `ETD`, `EThcD`,
+  `MPID`, `MPD`, ...), so every activation the reader emits can be written back.
+- The mzML reader used wrong accessions for activation. `MS:1002481` (higher
+  energy beam-type CID) now reads as `HCD` instead of `MPID`, `MS:1000435`
+  (photodissociation) reads as `MPID` instead of `MPD`, and `MS:1001880`
+  (in-source CID) is no longer read as `PD`. It now also reads `MS:1002631`
+  (EThcD), `MS:1000136` (SID), and ETD with `MS:1002631` or `MS:1002678` as
+  `EThcD`.
+- When an `<activation>` block holds several dissociation terms, the reader no
+  longer lets the last one overwrite the others: the first primary term sets
+  the name and the rest stay in the spectrum's `cv_params`, as does any
+  unrecognised term.
 - Vendor ingest stores short activation names (`SID`, `MPID` and `EThcD`
   included) instead of mzML term names, so they are no longer written as
   `HCD` or `ETD`.

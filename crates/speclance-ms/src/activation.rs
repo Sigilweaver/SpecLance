@@ -36,8 +36,8 @@ use openmassspec_io::core::Activation as A;
 
 /// Short name stored for an activation. Round-trips through [`parse_activation`]
 /// except `MPD`, which is an alias of `MPID`.
-pub(crate) fn activation_label(act: A) -> &'static str {
-    match act {
+pub(crate) fn activation_label(act: A) -> String {
+    let name = match act {
         A::CID => "CID",
         A::HCD => "HCD",
         A::ETD => "ETD",
@@ -49,7 +49,11 @@ pub(crate) fn activation_label(act: A) -> &'static str {
         A::PQD => "PQD",
         A::UVPD => "UVPD",
         A::SID => "SID",
-    }
+        // `Activation` is #[non_exhaustive]: keep the variant name for new
+        // ones; the writer rejects a name it cannot parse.
+        other => return format!("{other:?}"),
+    };
+    name.to_string()
 }
 
 /// Activation for a stored name, or `None` when the name is not recognised.
@@ -132,7 +136,7 @@ fn primary(acc: &str) -> Option<A> {
 /// ETD together with `MS:1002631` or `MS:1002678` is `EThcD`. The first
 /// primary term in document order sets the name; another term that names the
 /// same activation is accounted for, a different one is not.
-pub(crate) fn resolve_activation(accessions: &[&str]) -> (Option<&'static str>, Vec<bool>) {
+pub(crate) fn resolve_activation(accessions: &[&str]) -> (Option<String>, Vec<bool>) {
     let mut consumed = vec![false; accessions.len()];
     let has = |acc: &str| accessions.contains(&acc);
     let ethcd_pair = has(ETD) && (has(ETHCD) || has(SUPPLEMENTAL_BEAM_CID));
@@ -186,7 +190,7 @@ mod tests {
     #[test]
     fn every_activation_round_trips_through_its_label() {
         for a in ALL {
-            assert_eq!(parse_activation(activation_label(a)), Some(a), "{a:?}");
+            assert_eq!(parse_activation(&activation_label(a)), Some(a), "{a:?}");
         }
     }
 
@@ -248,7 +252,7 @@ mod tests {
         ];
         for (acc, want) in cases {
             let (name, used) = resolve_activation(&[acc]);
-            assert_eq!(name, Some(want), "{acc}");
+            assert_eq!(name.as_deref(), Some(want), "{acc}");
             assert_eq!(used, vec![true]);
         }
     }
@@ -270,7 +274,7 @@ mod tests {
             ["MS:1000598", "MS:1002678"],
         ] {
             let (name, used) = resolve_activation(&pair);
-            assert_eq!(name, Some("EThcD"), "{pair:?}");
+            assert_eq!(name.as_deref(), Some("EThcD"), "{pair:?}");
             assert_eq!(used, vec![true, true]);
         }
     }
@@ -278,15 +282,15 @@ mod tests {
     #[test]
     fn extra_terms_are_not_accounted_for() {
         let (name, used) = resolve_activation(&["MS:1000133", "MS:1002679"]);
-        assert_eq!(name, Some("CID"));
+        assert_eq!(name.as_deref(), Some("CID"));
         assert_eq!(used, vec![true, false]);
 
         let (name, used) = resolve_activation(&["MS:1000598", "MS:1000133"]);
-        assert_eq!(name, Some("ETD"));
+        assert_eq!(name.as_deref(), Some("ETD"));
         assert_eq!(used, vec![true, false]);
 
         let (name, used) = resolve_activation(&["MS:1000422", "MS:1002481"]);
-        assert_eq!(name, Some("HCD"));
+        assert_eq!(name.as_deref(), Some("HCD"));
         assert_eq!(used, vec![true, true]);
     }
 }

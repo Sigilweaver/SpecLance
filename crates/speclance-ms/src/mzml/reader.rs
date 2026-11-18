@@ -455,7 +455,7 @@ fn resolve_activation_terms(spec: &mut Spectrum, extra: &mut Vec<CvParam>) {
         .map(|&i| extra[i].accession.as_deref().unwrap_or(""))
         .collect();
     let (name, used) = crate::activation::resolve_activation(&accs);
-    spec.activation = name.map(str::to_string);
+    spec.activation = name;
     let drop: Vec<usize> = idx
         .iter()
         .zip(used)

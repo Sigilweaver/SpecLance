@@ -137,7 +137,7 @@ fn record_to_spectrum(run_id: &str, rec: &SpectrumRecord) -> Spectrum {
         .precursor
         .as_ref()
         .and_then(|p| p.activation)
-        .map(|a| crate::activation::activation_label(a).to_string());
+        .map(crate::activation::activation_label);
 
     // `ce_is_nce` flips the unit; SpecLance's column is just an f32, so we drop
     // normalized values rather than report them in the wrong unit.
