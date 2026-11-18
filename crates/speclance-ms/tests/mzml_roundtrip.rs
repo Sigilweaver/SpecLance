@@ -165,3 +165,51 @@ fn streaming_ingest_matches_parse_bytes() {
         assert_eq!(a.rt, b.rt);
     }
 }
+
+const MZ_B64: &str = "AAAAAAAAREAAAAAAAABJQAAAAAAAAFBA";
+
+fn tiny_with_mz_binary(body: &str) -> Vec<u8> {
+    TINY_MZML
+        .replace(
+            &format!("<binary>{MZ_B64}</binary>"),
+            &format!("<binary>{body}</binary>"),
+        )
+        .into_bytes()
+}
+
+fn assert_tiny_mz(data: &speclance_ms::mzml::MzmlData) {
+    assert_eq!(data.spectra[0].mz, vec![40.0, 50.0, 64.0]);
+}
+
+#[test]
+fn base64_with_char_ref_and_entity_is_decoded() {
+    let body = format!(
+        "{}&#10;{}&#x20;{}",
+        &MZ_B64[..8],
+        &MZ_B64[8..20],
+        &MZ_B64[20..]
+    );
+    let data = parse_bytes(&tiny_with_mz_binary(&body), "ref.mzML".into()).unwrap();
+    assert_tiny_mz(&data);
+}
+
+#[test]
+fn base64_in_cdata_is_decoded() {
+    let body = format!("<![CDATA[{}]]>", MZ_B64);
+    let data = parse_bytes(&tiny_with_mz_binary(&body), "cdata.mzML".into()).unwrap();
+    assert_tiny_mz(&data);
+}
+
+#[test]
+fn base64_split_across_text_and_cdata_is_decoded() {
+    let body = format!("{}<![CDATA[{}]]>", &MZ_B64[..12], &MZ_B64[12..]);
+    let data = parse_bytes(&tiny_with_mz_binary(&body), "mixed.mzML".into()).unwrap();
+    assert_tiny_mz(&data);
+}
+
+#[test]
+fn unknown_entity_in_binary_is_an_xml_error() {
+    let body = format!("{}&bogus;{}", &MZ_B64[..8], &MZ_B64[8..]);
+    let err = parse_bytes(&tiny_with_mz_binary(&body), "bad.mzML".into()).unwrap_err();
+    assert!(matches!(err, speclance_ms::MsError::Xml(_)), "{err:?}");
+}

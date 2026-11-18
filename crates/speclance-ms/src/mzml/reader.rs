@@ -415,6 +415,16 @@ fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
                     state.base64.push_str(txt.trim());
                 }
             }
+            Event::GeneralRef(r) if stack.last().map(|s| s.as_str()) == Some("binary") => {
+                if let Some(state) = current_binary.as_mut() {
+                    push_general_ref(&mut state.base64, &r)?;
+                }
+            }
+            Event::CData(c) if stack.last().map(|s| s.as_str()) == Some("binary") => {
+                if let Some(state) = current_binary.as_mut() {
+                    state.base64.push_str(c.xml10_content().trim());
+                }
+            }
             Event::Eof => break,
             _ => {}
         }
@@ -652,6 +662,17 @@ enum BinaryKind {
 }
 
 impl BinaryArrayState {
+    /// Decode the accumulated base64, ignoring the ASCII whitespace that
+    /// line wrapping and character references such as `&#10;` leave behind.
+    fn decode_base64(&self) -> MsResult<Vec<u8>> {
+        let compact: Vec<u8> = self
+            .base64
+            .bytes()
+            .filter(|b| !b.is_ascii_whitespace())
+            .collect();
+        Ok(base64::engine::general_purpose::STANDARD.decode(compact)?)
+    }
+
     fn apply_spectrum(self, spec: &mut Spectrum) -> MsResult<()> {
         if let Some(u) = &self.unsupported {
             return Err(MsError::Unsupported(format!(
@@ -662,8 +683,7 @@ impl BinaryArrayState {
         if matches!(self.kind, BinaryKind::Other) {
             return Ok(());
         }
-        let raw =
-            base64::engine::general_purpose::STANDARD.decode(self.base64.trim().as_bytes())?;
+        let raw = self.decode_base64()?;
         let bytes = if self.zlib {
             let mut d = ZlibDecoder::new(&raw[..]);
             let mut out = Vec::with_capacity(raw.len() * 4);
@@ -695,8 +715,7 @@ impl BinaryArrayState {
         if self.unsupported.is_some() {
             return Err(MsError::Unsupported("compression not supported".into()));
         }
-        let raw =
-            base64::engine::general_purpose::STANDARD.decode(self.base64.trim().as_bytes())?;
+        let raw = self.decode_base64()?;
         let bytes = if self.zlib {
             let mut d = ZlibDecoder::new(&raw[..]);
             let mut out = Vec::with_capacity(raw.len() * 4);
@@ -787,6 +806,26 @@ fn decode_floats_f32(bytes: &[u8], precision: u8) -> MsResult<Vec<f32>> {
             precision
         ))),
     }
+}
+
+/// Append the character a general reference (`&amp;`, `&#10;`, `&#x20;`)
+/// stands for. An entity that is neither predefined nor a character
+/// reference is an error, not skipped text.
+fn push_general_ref(out: &mut String, r: &quick_xml::events::BytesRef<'_>) -> MsResult<()> {
+    if let Some(c) = r.resolve_char_ref()? {
+        out.push(c);
+        return Ok(());
+    }
+    let name: &str = r;
+    match name {
+        "lt" => out.push('<'),
+        "gt" => out.push('>'),
+        "amp" => out.push('&'),
+        "apos" => out.push('\''),
+        "quot" => out.push('"'),
+        other => return Err(MsError::Xml(format!("unknown entity reference &{other};"))),
+    }
+    Ok(())
 }
 
 fn bytes_to_string(b: &str) -> String {
@@ -897,6 +936,16 @@ fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
                 if let Some(b) = current_binary.as_mut() {
                     let txt = quick_xml::escape::unescape(&t.xml10_content())?.into_owned();
                     b.base64.push_str(txt.trim());
+                }
+            }
+            Event::GeneralRef(r) if stack.last().map(|s| s.as_str()) == Some("binary") => {
+                if let Some(b) = current_binary.as_mut() {
+                    push_general_ref(&mut b.base64, &r)?;
+                }
+            }
+            Event::CData(c) if stack.last().map(|s| s.as_str()) == Some("binary") => {
+                if let Some(b) = current_binary.as_mut() {
+                    b.base64.push_str(c.xml10_content().trim());
                 }
             }
             Event::Eof => break,
