@@ -200,7 +200,7 @@ async fn spectrum_fields_round_trip_exactly() {
     let input = vec![full, sparse];
     store.append_spectra(&input).await.unwrap();
 
-    let out = batches_to_spectra(&store.read_spectra("full").await.unwrap());
+    let out = batches_to_spectra(&store.read_spectra("full").await.unwrap()).unwrap();
     // `batches_to_spectra` materialises an all-null precursor as `None`.
     assert_eq!(as_json(&out), as_json(&input));
 }
@@ -226,7 +226,7 @@ async fn run_and_chromatogram_fields_round_trip_exactly() {
     let got = store.read_run("run-1").await.unwrap().expect("run present");
     assert_eq!(got.num_rows(), 1);
     assert_eq!(
-        as_json(&batches_to_runs(std::slice::from_ref(&got))),
+        as_json(&batches_to_runs(std::slice::from_ref(&got)).unwrap()),
         as_json(std::slice::from_ref(&run))
     );
     assert!(store.read_run("run-2").await.unwrap().is_none());
@@ -262,7 +262,7 @@ async fn run_and_chromatogram_fields_round_trip_exactly() {
         }])
         .await
         .unwrap();
-    let got = batches_to_chromatograms(&store.read_chromatograms("run-1").await.unwrap());
+    let got = batches_to_chromatograms(&store.read_chromatograms("run-1").await.unwrap()).unwrap();
     assert_eq!(as_json(&got), as_json(&chroms));
 }
 
@@ -286,14 +286,14 @@ async fn scans_return_every_row_in_insertion_order() {
         store.append_spectra(&batch).await.unwrap();
     }
 
-    let got = batches_to_spectra(&store.read_spectra("ordered").await.unwrap());
+    let got = batches_to_spectra(&store.read_spectra("ordered").await.unwrap()).unwrap();
     assert_eq!(scan_nums(&got), expected);
 
     let all = store
         .query_window("ordered", f64::NEG_INFINITY, f64::INFINITY, None)
         .await
         .unwrap();
-    assert_eq!(scan_nums(&batches_to_spectra(&all)), expected);
+    assert_eq!(scan_nums(&batches_to_spectra(&all).unwrap()), expected);
 
     // Unfiltered scan of the whole table returns both runs: 2 x 1250 rows.
     let table = store.spectra_table().await.unwrap();
@@ -319,9 +319,9 @@ async fn query_window_bounds_are_inclusive_and_nulls_follow_bounds() {
     let q = |lo: f64, hi: f64, lvl: Option<u8>| {
         let store = &store;
         async move {
-            scan_nums(&batches_to_spectra(
-                &store.query_window("b", lo, hi, lvl).await.unwrap(),
-            ))
+            scan_nums(
+                &batches_to_spectra(&store.query_window("b", lo, hi, lvl).await.unwrap()).unwrap(),
+            )
         }
     };
 
@@ -373,7 +373,7 @@ async fn run_id_filters_escape_quotes() {
         .await
         .unwrap();
 
-    let got = batches_to_spectra(&store.read_spectra(tricky).await.unwrap());
+    let got = batches_to_spectra(&store.read_spectra(tricky).await.unwrap()).unwrap();
     assert_eq!(scan_nums(&got), vec![1]);
     assert!(got.iter().all(|s| s.run_id == tricky));
 
@@ -382,14 +382,15 @@ async fn run_id_filters_escape_quotes() {
             .query_window(tricky, f64::NEG_INFINITY, f64::INFINITY, None)
             .await
             .unwrap(),
-    );
+    )
+    .unwrap();
     assert_eq!(scan_nums(&got), vec![1]);
 
-    let got = batches_to_spectra(&store.read_spectra("o'brien").await.unwrap());
+    let got = batches_to_spectra(&store.read_spectra("o'brien").await.unwrap()).unwrap();
     assert_eq!(scan_nums(&got), vec![3]);
 
     let run = store.read_run(tricky).await.unwrap().expect("run present");
-    assert_eq!(batches_to_runs(&[run])[0].run_id, tricky);
+    assert_eq!(batches_to_runs(&[run]).unwrap()[0].run_id, tricky);
 }
 
 #[tokio::test]
@@ -436,11 +437,11 @@ async fn indexed_queries_return_the_same_rows_as_scans() {
         let mut out = Vec::new();
         for &(lo, hi, lvl) in windows {
             let mut specs =
-                batches_to_spectra(&store.query_window("idx", lo, hi, lvl).await.unwrap());
+                batches_to_spectra(&store.query_window("idx", lo, hi, lvl).await.unwrap()).unwrap();
             specs.sort_by_key(|s| s.scan_num);
             out.push(as_json(&specs));
         }
-        let mut all = batches_to_spectra(&store.read_spectra("idx").await.unwrap());
+        let mut all = batches_to_spectra(&store.read_spectra("idx").await.unwrap()).unwrap();
         all.sort_by_key(|s| s.scan_num);
         out.push(as_json(&all));
         out
@@ -480,7 +481,8 @@ async fn indexed_queries_return_the_same_rows_as_scans() {
         .append_spectra(&[synth_spectrum("idx", 1000, 1, Some(25.0))])
         .await
         .unwrap();
-    let late = batches_to_spectra(&store.query_window("idx", 25.0, 25.0, None).await.unwrap());
+    let late =
+        batches_to_spectra(&store.query_window("idx", 25.0, 25.0, None).await.unwrap()).unwrap();
     let mut late_scans = scan_nums(&late);
     late_scans.sort_unstable();
     assert_eq!(late_scans, vec![50, 1000]);

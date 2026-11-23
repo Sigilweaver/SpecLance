@@ -88,6 +88,11 @@ Implemented:
   - `CID` is written as `MS:1000133`; the supplemental terms `MS:1002678` and `MS:1002679` and any other activation
     term are kept in `cv_params` on read and are not written back.
   - A spectrum with an activation but no precursor cannot be written (`MsError::Unsupported`).
+- After an interrupted ingest, rows of the unfinished run stay in the spectra table, and in the chromatograms table if
+  the file has chromatograms, until the same file is ingested again; until then `read_spectra` and `query_window`
+  return them.
+- Two processes must not ingest the same file into the same store at once. Ingests are not coordinated: one can delete
+  rows the other has written, which can leave a run row with missing spectra.
 
 ## Data flow
 

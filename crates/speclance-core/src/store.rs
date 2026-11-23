@@ -25,7 +25,7 @@ use lancedb::{
     Connection, Table,
 };
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::schema::{
     chromatograms_schema, runs_schema, spectra_schema, CHROMATOGRAMS_TABLE, RUNS_TABLE,
     SPECTRA_TABLE,
@@ -65,8 +65,60 @@ impl Store {
         open_or_create(&self.conn, CHROMATOGRAMS_TABLE, chromatograms_schema()).await
     }
 
-    /// Append a single run row.
+    /// True if the runs table holds a row for `run_id`.
+    ///
+    /// The run row is the commit marker of an ingest: ingest writes it last,
+    /// after the spectra and chromatograms, so a run exists only once its
+    /// row does. Spectra or chromatograms without a run row belong to an
+    /// ingest that did not finish; see [`Store::discard_unfinished_run`].
+    pub async fn contains_run(&self, run_id: &str) -> Result<bool> {
+        let names = self.table_names().await?;
+        if !names.iter().any(|n| n == RUNS_TABLE) {
+            return Ok(false);
+        }
+        let table = self.conn.open_table(RUNS_TABLE).execute().await?;
+        Ok(table.count_rows(Some(run_filter(run_id))).await? > 0)
+    }
+
+    /// Return [`Error::RunExists`] if `run_id` is already in the store.
+    /// Call before writing any rows for a new run.
+    pub async fn ensure_run_absent(&self, run_id: &str) -> Result<()> {
+        if self.contains_run(run_id).await? {
+            return Err(Error::RunExists(run_id.to_string()));
+        }
+        Ok(())
+    }
+
+    /// Delete the spectra and chromatograms of `run_id` and return how many
+    /// rows were deleted.
+    ///
+    /// This only removes rows of a run that has no run row, the leftovers of
+    /// an ingest that failed or was interrupted before it wrote the run
+    /// row. It fails with [`Error::RunExists`], and deletes nothing, when the
+    /// run row is present.
+    pub async fn discard_unfinished_run(&self, run_id: &str) -> Result<u64> {
+        self.ensure_run_absent(run_id).await?;
+        let names = self.table_names().await?;
+        let filter = run_filter(run_id);
+        let mut removed = 0u64;
+        for name in [SPECTRA_TABLE, CHROMATOGRAMS_TABLE] {
+            if !names.iter().any(|n| n == name) {
+                continue;
+            }
+            let table = self.conn.open_table(name).execute().await?;
+            let rows = table.count_rows(Some(filter.clone())).await?;
+            if rows > 0 {
+                table.delete(&filter).await?;
+                removed += rows as u64;
+            }
+        }
+        Ok(removed)
+    }
+
+    /// Append a single run row. Fails with [`Error::RunExists`] if a run
+    /// row with the same `run_id` is already present.
     pub async fn append_run(&self, run: &Run) -> Result<()> {
+        self.ensure_run_absent(&run.run_id).await?;
         let batch = run_to_batch(std::slice::from_ref(run))?;
         let table = self.runs_table().await?;
         table.add(vec![batch]).execute().await?;
@@ -98,7 +150,7 @@ impl Store {
     /// Read all spectra for a given run, ordered by scan_num.
     pub async fn read_spectra(&self, run_id: &str) -> Result<Vec<RecordBatch>> {
         let table = self.spectra_table().await?;
-        let filter = format!("run_id = '{}'", run_id.replace('\'', "''"));
+        let filter = run_filter(run_id);
         let stream = table.query().only_if(filter).execute().await?;
         let batches: Vec<RecordBatch> = stream.try_collect().await?;
         Ok(batches)
@@ -107,7 +159,7 @@ impl Store {
     /// Read a single run row by id, if present.
     pub async fn read_run(&self, run_id: &str) -> Result<Option<RecordBatch>> {
         let table = self.runs_table().await?;
-        let filter = format!("run_id = '{}'", run_id.replace('\'', "''"));
+        let filter = run_filter(run_id);
         let stream = table.query().only_if(filter).execute().await?;
         let batches: Vec<RecordBatch> = stream.try_collect().await?;
         Ok(batches.into_iter().next())
@@ -120,7 +172,7 @@ impl Store {
             return Ok(Vec::new());
         }
         let table = self.chromatograms_table().await?;
-        let filter = format!("run_id = '{}'", run_id.replace('\'', "''"));
+        let filter = run_filter(run_id);
         let stream = table.query().only_if(filter).execute().await?;
         let batches: Vec<RecordBatch> = stream.try_collect().await?;
         Ok(batches)
@@ -140,7 +192,7 @@ impl Store {
         ms_level: Option<u8>,
     ) -> Result<Vec<RecordBatch>> {
         let table = self.spectra_table().await?;
-        let mut clauses = vec![format!("run_id = '{}'", run_id.replace('\'', "''"))];
+        let mut clauses = vec![run_filter(run_id)];
         if rt_min.is_finite() {
             clauses.push(format!("rt >= {}", rt_min));
         }
@@ -204,6 +256,11 @@ async fn open_or_create(
     } else {
         Ok(conn.create_empty_table(name, schema).execute().await?)
     }
+}
+
+/// Lance filter selecting the rows of `run_id`, with single quotes escaped.
+fn run_filter(run_id: &str) -> String {
+    format!("run_id = '{}'", run_id.replace('\'', "''"))
 }
 
 // -- Arrow conversion helpers --

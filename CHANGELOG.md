@@ -60,7 +60,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   already used by the release workflow. Verified with a local build
   and test pass on Linux; the macOS/Windows runs have not been
   observed in Actions yet.
-
+- `batches_to_runs`, `batches_to_spectra` and `batches_to_chromatograms` in
+  `speclance-core` return `Result` and report a missing or mistyped column as
+  `Error::Schema` instead of panicking. Callers add `?` or handle the error.
+  An optional column that has the wrong Arrow type now fails the read the same
+  way; it was read as `None` before.
+- `speclance_core::Error` is `#[non_exhaustive]`, so a new variant is no longer
+  a breaking change.
 
 ### Fixed
 
@@ -89,6 +95,24 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Vendor ingest stores short activation names (`SID`, `MPID` and `EThcD`
   included) instead of mzML term names, so they are no longer written as
   `HCD` or `ETD`.
+- Ingesting a run that is already in the store fails with the new
+  `Error::RunExists` (a Python `OSError`) before any row is written, instead
+  of appending a second copy of its rows that exported as invalid mzML.
+  `Store::contains_run` and `Store::ensure_run_absent` expose the check, and
+  `Store::append_run` rejects an existing `run_id`.
+- Ingest writes the run row after the spectra and chromatograms, and a run
+  exists once its run row does. A failed or interrupted ingest no longer
+  blocks a retry of the same file: ingest deletes the spectra and
+  chromatograms of that `run_id` that have no run row (reporting how many on
+  stderr), and a failure removes the rows it had already written.
+  `Store::discard_unfinished_run` does the deletion. Two processes that ingest
+  the same file into the same store at once are not coordinated: one can delete
+  rows the other wrote, which can leave a run row with missing spectra.
+- An mzML spectrum whose `index` attribute is not a number returns
+  `MsError::Malformed` instead of being read as scan 1.
+- Vendor ingest returns the I/O error when the size of a vendor file or
+  directory cannot be read, instead of using a smaller size and so a different
+  `run_id`.
 
 ### Security
 

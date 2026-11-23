@@ -480,7 +480,10 @@ fn parse_spectrum_attrs(e: &BytesStart, spec: &mut Spectrum) -> MsResult<()> {
         match key.as_str() {
             "id" => spec.native_id = Some(val),
             "index" => {
-                spec.scan_num = val.parse::<u32>().unwrap_or(0).saturating_add(1);
+                let index = val.parse::<u32>().map_err(|e| {
+                    MsError::Malformed(format!("spectrum index attribute {val:?}: {e}"))
+                })?;
+                spec.scan_num = index.saturating_add(1);
             }
             _ => {}
         }

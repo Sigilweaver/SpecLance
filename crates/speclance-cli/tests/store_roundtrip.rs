@@ -31,15 +31,15 @@ async fn store_roundtrip_real_thermo_if_present() {
         .await
         .unwrap()
         .expect("run row");
-    let runs = batches_to_runs(std::slice::from_ref(&run_batch));
+    let runs = batches_to_runs(std::slice::from_ref(&run_batch)).unwrap();
     let run = runs.into_iter().next().unwrap();
     let spec_batches = store.read_spectra(&original.run.run_id).await.unwrap();
-    let spectra = batches_to_spectra(&spec_batches);
+    let spectra = batches_to_spectra(&spec_batches).unwrap();
     let chrom_batches = store
         .read_chromatograms(&original.run.run_id)
         .await
         .unwrap();
-    let chromatograms = batches_to_chromatograms(&chrom_batches);
+    let chromatograms = batches_to_chromatograms(&chrom_batches).unwrap();
 
     assert_eq!(spectra.len(), original.spectra.len());
     // Chromatograms survive the Lance roundtrip; they are dropped by the
