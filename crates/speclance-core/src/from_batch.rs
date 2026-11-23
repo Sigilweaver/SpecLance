@@ -363,4 +363,35 @@ mod tests {
         let b = RecordBatch::try_new(schema, cols).unwrap();
         assert!(matches!(batches_to_runs(&[b]), Err(Error::Schema(_))));
     }
+
+    #[test]
+    fn list_column_with_wrong_item_type_is_schema_error() {
+        use arrow_array::types::Float64Type;
+        use arrow_array::LargeListArray;
+
+        // `time` and `intensity` must hold Float32 items; Float64 items
+        // decode to an error rather than to empty or converted values.
+        let items = LargeListArray::from_iter_primitive::<Float64Type, _, _>(vec![Some(vec![
+            Some(1.0f64),
+            Some(2.0),
+        ])]);
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("run_id", DataType::Utf8, false),
+            Field::new("chrom_id", DataType::Utf8, false),
+            Field::new("time", items.data_type().clone(), false),
+            Field::new("intensity", items.data_type().clone(), false),
+        ]));
+        let cols: Vec<ArrayRef> = vec![
+            Arc::new(StringArray::from(vec!["r1"])),
+            Arc::new(StringArray::from(vec!["TIC"])),
+            Arc::new(items.clone()),
+            Arc::new(items),
+        ];
+        let b = RecordBatch::try_new(schema, cols).unwrap();
+        let err = batches_to_chromatograms(&[b]).unwrap_err();
+        assert!(
+            matches!(err, Error::Schema(ref m) if m.contains("Float32")),
+            "{err}"
+        );
+    }
 }

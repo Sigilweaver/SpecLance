@@ -349,6 +349,8 @@ precision of the original storage width.
   - `CID` is written as `MS:1000133`; the supplemental terms `MS:1002678` and `MS:1002679` and any other activation
     term are kept in `cv_params` on read and are not written back.
   - A spectrum with an activation but no precursor cannot be written (`MsError::Unsupported`).
+- After an interrupted ingest, rows of the unfinished run stay in the spectra table until the same file is ingested
+  again.
 
 ## Dependency Map
 

@@ -121,14 +121,57 @@ async fn ingest_one(store: &Store, path: &Path) -> Result<()> {
 
 const SPECTRUM_CHUNK: usize = 2048;
 
+/// Start an ingest of `run_id`: refuse a run that is already in the store,
+/// and delete the spectra and chromatograms an earlier failed or interrupted
+/// ingest of the same run left without a run row.
+async fn begin_ingest(store: &Store, run_id: &str) -> Result<()> {
+    store.ensure_run_absent(run_id).await?;
+    let removed = store
+        .discard_unfinished_run(run_id)
+        .await
+        .context("remove leftover rows of an earlier unfinished ingest")?;
+    if removed > 0 {
+        eprintln!(
+            "  removed {removed} leftover rows of run {run_id} from an earlier unfinished ingest"
+        );
+    }
+    Ok(())
+}
+
+/// After `err` stopped an ingest of `run_id`, delete the rows it already
+/// wrote and return `err`. If the cleanup fails too, both errors are in the
+/// returned chain.
+async fn abort_ingest(store: &Store, run_id: &str, err: anyhow::Error) -> anyhow::Error {
+    match store.discard_unfinished_run(run_id).await {
+        Ok(0) => err,
+        Ok(removed) => {
+            eprintln!("  removed {removed} rows of run {run_id} written before the failure");
+            err
+        }
+        Err(cleanup) => err.context(format!(
+            "ingest failed, and removing the rows already written for run {run_id} also failed: {cleanup}"
+        )),
+    }
+}
+
 /// Stream spectra straight from the mzML reader into the store in
 /// `SPECTRUM_CHUNK`-sized batches. Memory usage is bounded by the
 /// source byte buffer plus one chunk of decoded peak arrays, which
 /// keeps multi-GB mzML ingests within reasonable RSS.
+///
+/// The run row is written last. Until it exists the run is not in the
+/// store, and a failure removes the rows written so far.
 async fn ingest_mzml_streaming(store: &Store, path: &Path) -> Result<()> {
-    let mut ingest = MzmlIngest::open(path).context("open mzml")?;
+    let ingest = MzmlIngest::open(path).context("open mzml")?;
     let run_id = ingest.run_id().to_string();
-    store.ensure_run_absent(&run_id).await?;
+    begin_ingest(store, &run_id).await?;
+    match stream_mzml_rows(store, ingest, &run_id).await {
+        Ok(()) => Ok(()),
+        Err(e) => Err(abort_ingest(store, &run_id, e).await),
+    }
+}
+
+async fn stream_mzml_rows(store: &Store, mut ingest: MzmlIngest, run_id: &str) -> Result<()> {
     let mut buf: Vec<speclance_core::Spectrum> = Vec::with_capacity(SPECTRUM_CHUNK);
     let mut total = 0u32;
     let mut ms1 = 0u32;
@@ -160,10 +203,10 @@ async fn ingest_mzml_streaming(store: &Store, path: &Path) -> Result<()> {
         chromatograms.len(),
         run_id
     );
-    store.append_run(&run).await?;
     if !chromatograms.is_empty() {
         store.append_chromatograms(&chromatograms).await?;
     }
+    store.append_run(&run).await?;
     Ok(())
 }
 
@@ -171,22 +214,33 @@ async fn ingest_mzml_streaming(store: &Store, path: &Path) -> Result<()> {
 /// [`MzmlData`] (`thermo`, `bruker`, `waters`). Vendor sources are
 /// converted to mzML in-memory so the working set is already bounded
 /// by the converter's own buffering.
+///
+/// The run row is written last, as in the streaming path.
 #[cfg(feature = "vendors")]
 async fn ingest_buffered(store: &Store, data: speclance_ms::mzml::MzmlData) -> Result<()> {
+    let run_id = data.run.run_id.clone();
+    begin_ingest(store, &run_id).await?;
+    match write_buffered_rows(store, &data).await {
+        Ok(()) => Ok(()),
+        Err(e) => Err(abort_ingest(store, &run_id, e).await),
+    }
+}
+
+#[cfg(feature = "vendors")]
+async fn write_buffered_rows(store: &Store, data: &speclance_ms::mzml::MzmlData) -> Result<()> {
     eprintln!(
         "  parsed {} spectra, {} chromatograms (run_id={})",
         data.spectra.len(),
         data.chromatograms.len(),
         data.run.run_id
     );
-    store.ensure_run_absent(&data.run.run_id).await?;
-    store.append_run(&data.run).await?;
     for chunk in data.spectra.chunks(SPECTRUM_CHUNK) {
         store.append_spectra(chunk).await?;
     }
     if !data.chromatograms.is_empty() {
         store.append_chromatograms(&data.chromatograms).await?;
     }
+    store.append_run(&data.run).await?;
     Ok(())
 }
 
@@ -297,4 +351,65 @@ async fn cmd_query(
         );
     }
     Ok(())
+}
+
+#[cfg(all(test, feature = "vendors"))]
+mod tests {
+    use super::*;
+    use speclance_core::{Run, Spectrum};
+    use speclance_ms::mzml::MzmlData;
+
+    fn data(run_id: &str, spectra: u32) -> MzmlData {
+        MzmlData {
+            run: Run {
+                run_id: run_id.to_string(),
+                source_format: "thermo-raw".to_string(),
+                ..Default::default()
+            },
+            spectra: (1..=spectra)
+                .map(|scan_num| Spectrum {
+                    run_id: run_id.to_string(),
+                    scan_num,
+                    ms_level: 1,
+                    mz: vec![100.0],
+                    intensity: vec![1.0],
+                    ..Default::default()
+                })
+                .collect(),
+            chromatograms: Vec::new(),
+        }
+    }
+
+    async fn rows(store: &Store, table: &str) -> usize {
+        let names = store.table_names().await.unwrap();
+        if !names.iter().any(|n| n == table) {
+            return 0;
+        }
+        let t = store.conn.open_table(table).execute().await.unwrap();
+        t.count_rows(None).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn buffered_ingest_refuses_a_run_already_in_the_store() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = Store::open(tmp.path().to_str().unwrap()).await.unwrap();
+        ingest_buffered(&store, data("r1", 3)).await.unwrap();
+
+        let err = ingest_buffered(&store, data("r1", 3)).await.unwrap_err();
+        assert!(err.to_string().contains("already in this store"), "{err}");
+        assert_eq!(rows(&store, "spectra").await, 3);
+        assert_eq!(rows(&store, "runs").await, 1);
+    }
+
+    #[tokio::test]
+    async fn buffered_ingest_replaces_leftover_rows_of_an_unfinished_run() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = Store::open(tmp.path().to_str().unwrap()).await.unwrap();
+        // Spectra without a run row, as an interrupted ingest leaves.
+        store.append_spectra(&data("r1", 5).spectra).await.unwrap();
+
+        ingest_buffered(&store, data("r1", 3)).await.unwrap();
+        assert_eq!(rows(&store, "spectra").await, 3);
+        assert_eq!(rows(&store, "runs").await, 1);
+    }
 }

@@ -22,6 +22,48 @@ fn map_err<E: std::fmt::Display>(e: E) -> PyErr {
     PyIOError::new_err(e.to_string())
 }
 
+/// Stream the spectra, chromatograms and finally the run row of `ingest`
+/// into `store`. The run row is the commit marker, so it is written last.
+async fn write_mzml_rows(store: &CoreStore, mut ingest: MzmlIngest) -> PyResult<()> {
+    let mut buf = Vec::with_capacity(SPECTRUM_CHUNK);
+    let mut total = 0u32;
+    let mut ms1 = 0u32;
+    let mut ms2 = 0u32;
+    while let Some(s) = ingest
+        .next_spectrum()
+        .map_err(|e| PyIOError::new_err(format!("parse spectrum: {e}")))?
+    {
+        if s.ms_level == 1 {
+            ms1 += 1;
+        } else if s.ms_level >= 2 {
+            ms2 += 1;
+        }
+        total += 1;
+        buf.push(s);
+        if buf.len() >= SPECTRUM_CHUNK {
+            store.append_spectra(&buf).await.map_err(map_err)?;
+            buf.clear();
+        }
+    }
+    if !buf.is_empty() {
+        store.append_spectra(&buf).await.map_err(map_err)?;
+    }
+    let chromatograms = ingest
+        .read_chromatograms()
+        .map_err(|e| PyIOError::new_err(format!("parse chromatograms: {e}")))?;
+    let run = ingest
+        .finalize_run(total, ms1, ms2)
+        .map_err(|e| PyIOError::new_err(format!("finalize run: {e}")))?;
+    if !chromatograms.is_empty() {
+        store
+            .append_chromatograms(&chromatograms)
+            .await
+            .map_err(map_err)?;
+    }
+    store.append_run(&run).await.map_err(map_err)?;
+    Ok(())
+}
+
 /// Lance-backed mass-spectrometry store.
 #[pyclass(module = "speclance._speclance", name = "Store")]
 struct PyStore {
@@ -50,51 +92,47 @@ impl PyStore {
 
     /// Ingest a single `.mzML` file using the streaming reader.
     /// Returns the resulting `run_id`.
+    ///
+    /// Raises `OSError` if the run is already in the store. The run row is
+    /// written last; rows left by an earlier unfinished ingest of the same
+    /// file are removed first, and a failure removes the rows written so far.
     fn ingest_mzml(&self, path: &str) -> PyResult<String> {
         let store = Arc::clone(&self.inner);
         let p = path.to_string();
         self.rt.block_on(async move {
-            let mut ingest = MzmlIngest::open(Path::new(&p))
+            let ingest = MzmlIngest::open(Path::new(&p))
                 .map_err(|e| PyIOError::new_err(format!("open mzml: {e}")))?;
             let run_id = ingest.run_id().to_string();
             store.ensure_run_absent(&run_id).await.map_err(map_err)?;
-            let mut buf = Vec::with_capacity(SPECTRUM_CHUNK);
-            let mut total = 0u32;
-            let mut ms1 = 0u32;
-            let mut ms2 = 0u32;
-            while let Some(s) = ingest
-                .next_spectrum()
-                .map_err(|e| PyIOError::new_err(format!("parse spectrum: {e}")))?
-            {
-                if s.ms_level == 1 {
-                    ms1 += 1;
-                } else if s.ms_level >= 2 {
-                    ms2 += 1;
-                }
-                total += 1;
-                buf.push(s);
-                if buf.len() >= SPECTRUM_CHUNK {
-                    store.append_spectra(&buf).await.map_err(map_err)?;
-                    buf.clear();
-                }
+            let leftover = store
+                .discard_unfinished_run(&run_id)
+                .await
+                .map_err(|e| {
+                    PyIOError::new_err(format!(
+                        "remove leftover rows of an earlier unfinished ingest: {e}"
+                    ))
+                })?;
+            if leftover > 0 {
+                eprintln!(
+                    "removed {leftover} leftover rows of run {run_id} from an earlier unfinished ingest"
+                );
             }
-            if !buf.is_empty() {
-                store.append_spectra(&buf).await.map_err(map_err)?;
+            match write_mzml_rows(&store, ingest).await {
+                Ok(()) => Ok(run_id),
+                Err(e) => match store.discard_unfinished_run(&run_id).await {
+                    Ok(removed) => {
+                        if removed > 0 {
+                            eprintln!(
+                                "removed {removed} rows of run {run_id} written before the failure"
+                            );
+                        }
+                        Err(e)
+                    }
+                    Err(cleanup) => Err(PyIOError::new_err(format!(
+                        "{e}; removing the rows already written for run {run_id} also failed: {cleanup}"
+                    ))),
+                },
             }
-            let chromatograms = ingest
-                .read_chromatograms()
-                .map_err(|e| PyIOError::new_err(format!("parse chromatograms: {e}")))?;
-            let run = ingest
-                .finalize_run(total, ms1, ms2)
-                .map_err(|e| PyIOError::new_err(format!("finalize run: {e}")))?;
-            store.append_run(&run).await.map_err(map_err)?;
-            if !chromatograms.is_empty() {
-                store
-                    .append_chromatograms(&chromatograms)
-                    .await
-                    .map_err(map_err)?;
-            }
-            Ok::<_, PyErr>(run_id)
         })
     }
 

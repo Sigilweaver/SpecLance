@@ -21,9 +21,8 @@ use crate::error::{MsError, MsResult};
 use crate::mzml::MzmlData;
 
 /// Detect the vendor format at `path` and ingest the bundle into a
-/// [`MzmlData`]. The container is named after mzML for historical reasons but
-/// is now the canonical in-memory shape every SpecLance ingester (mzML reader
-/// included) produces.
+/// [`MzmlData`]. `MzmlData` is the in-memory shape every SpecLance ingester
+/// (the mzML reader included) produces.
 pub fn ingest<P: AsRef<Path>>(path: P) -> MsResult<MzmlData> {
     let path = path.as_ref();
     let detected = detect_format(path).ok_or_else(|| {

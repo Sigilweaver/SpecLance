@@ -111,3 +111,37 @@ def test_reingest_same_run_is_rejected(tmp_path):
     runs = store.runs()
     assert len(runs) == 1
     assert len(store.query_window(run_id)) == 1
+
+
+def _many_spectra_mzml(count, last_index):
+    """TINY_MZML with `count` copies of its spectrum; the last one has
+    `last_index` as its index attribute."""
+    start = TINY_MZML.index("      <spectrum index=")
+    end = TINY_MZML.index("</spectrum>\n") + len("</spectrum>\n")
+    block = TINY_MZML[start:end]
+    spectra = []
+    for i in range(count):
+        index = last_index if i + 1 == count else str(i)
+        spectra.append(
+            block.replace('index="0" id="scan=1"', f'index="{index}" id="scan={i + 1}"')
+        )
+    head = TINY_MZML[:start].replace('<spectrumList count="1"', f'<spectrumList count="{count}"')
+    return head + "".join(spectra) + TINY_MZML[end:]
+
+
+def test_failed_ingest_leaves_no_rows_and_the_file_can_be_retried(tmp_path):
+    mzml_path = tmp_path / "run.mzML"
+    store = speclance.Store.open(str(tmp_path / "store"))
+
+    # 2050 spectra: the first write batch (2048) is stored before the bad
+    # index of the last spectrum is reached.
+    mzml_path.write_text(_many_spectra_mzml(2050, "x"))
+    with pytest.raises(OSError, match="spectrum index"):
+        store.ingest_mzml(str(mzml_path))
+    assert store.runs() == []
+
+    # Same path and byte length, so the same run_id.
+    mzml_path.write_text(_many_spectra_mzml(2050, "9"))
+    run_id = store.ingest_mzml(str(mzml_path))
+    assert len(store.runs()) == 1
+    assert len(store.query_window(run_id)) == 2050
