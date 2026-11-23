@@ -113,6 +113,9 @@ pub struct MzmlIngest {
     /// Binary data arrays that are neither m/z nor intensity (time and
     /// intensity for chromatograms), by array name. They are not decoded.
     skipped: Mutex<BTreeMap<String, u64>>,
+    /// The same for the chromatograms of the last `read_chromatograms` call,
+    /// kept apart so that calling it again does not count twice.
+    chrom_skipped: Mutex<BTreeMap<String, u64>>,
 }
 
 /// What `finalize_run` adds to `run_metadata` when arrays were skipped.
@@ -194,6 +197,7 @@ impl MzmlIngest {
             cursor: spec_list_open_end + 1,
             chrom_range,
             skipped: Mutex::new(BTreeMap::new()),
+            chrom_skipped: Mutex::new(BTreeMap::new()),
             bytes,
             source_path,
             run_id,
@@ -252,26 +256,21 @@ impl MzmlIngest {
     /// Parse all chromatograms in `<chromatogramList>` (or an empty
     /// vector if absent). Binary data arrays other than time and
     /// intensity are skipped and counted, see
-    /// [`skipped_arrays`](Self::skipped_arrays).
+    /// [`skipped_arrays`](Self::skipped_arrays); a repeated call replaces the
+    /// chromatogram counts instead of adding to them. An array with an
+    /// MS-Numpress term returns `MsError::Unsupported`.
     pub fn read_chromatograms(&self) -> MsResult<Vec<Chromatogram>> {
         match self.chrom_range {
             Some((s, e)) => {
                 let mut skipped = BTreeMap::new();
                 let result = parse_chromatograms(&self.bytes[s..e], &self.run_id, &mut skipped);
-                self.add_skipped(skipped);
+                *self
+                    .chrom_skipped
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = skipped;
                 result
             }
             None => Ok(Vec::new()),
-        }
-    }
-
-    fn add_skipped(&self, found: BTreeMap<String, u64>) {
-        let mut all = self
-            .skipped
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (name, n) in found {
-            *all.entry(name).or_default() += n;
         }
     }
 
@@ -281,10 +280,19 @@ impl MzmlIngest {
     /// here and not decoded. An array with no name term is counted as
     /// `"unnamed array"`.
     pub fn skipped_arrays(&self) -> BTreeMap<String, u64> {
-        self.skipped
+        let mut all = self
+            .skipped
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clone()
+            .clone();
+        let chrom = self
+            .chrom_skipped
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for (name, n) in chrom.iter() {
+            *all.entry(name.clone()).or_default() += n;
+        }
+        all
     }
 
     /// Total of [`skipped_arrays`](Self::skipped_arrays).
@@ -317,10 +325,7 @@ impl MzmlIngest {
     /// counts; call this after [`read_chromatograms`](Self::read_chromatograms)
     /// so the chromatogram arrays are included.
     pub fn finalize_run(self, spectrum_count: u32, ms1: u32, ms2: u32) -> MsResult<Run> {
-        let skipped = self
-            .skipped
-            .into_inner()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let skipped = self.skipped_arrays();
         let mut run = self.base_run;
         run.spectrum_count = Some(spectrum_count);
         run.ms1_count = Some(ms1);
@@ -723,9 +728,12 @@ fn apply_cv_to_spectrum(
     // Only `MS:1002815` (inverse reduced ion mobility, 1/K0) fills
     // `inv_mobility`. `MS:1002476` (ion mobility drift time) is a different
     // quantity and unit, so it stays in `cv_params` with the other scan terms,
-    // as does a 1/K0 value that is not a number.
+    // as does a 1/K0 value that is not a finite number.
     if context == "scan" && acc == "MS:1002815" {
-        if let Some(v) = val.and_then(|s| s.parse::<f64>().ok()) {
+        if let Some(v) = val
+            .and_then(|s| s.parse::<f64>().ok())
+            .filter(|v| v.is_finite())
+        {
             spec.inv_mobility = Some(v);
             return;
         }
@@ -887,8 +895,11 @@ impl BinaryArrayState {
         chrom: &mut Chromatogram,
         skipped: &mut BTreeMap<String, u64>,
     ) -> MsResult<()> {
-        if self.unsupported.is_some() {
-            return Err(MsError::Unsupported("compression not supported".into()));
+        if let Some(u) = &self.unsupported {
+            return Err(MsError::Unsupported(format!(
+                "compression codec {} not yet supported",
+                u
+            )));
         }
         if matches!(self.kind, BinaryKind::Other) {
             self.count_skipped(skipped);
@@ -1113,6 +1124,10 @@ fn parse_one_chromatogram(
                                 "MS:1000523" => b.precision = 64,
                                 "MS:1000521" => b.precision = 32,
                                 "MS:1000574" => b.zlib = true,
+                                "MS:1002312" | "MS:1002313" | "MS:1002314" | "MS:1002746"
+                                | "MS:1002747" | "MS:1002748" => {
+                                    b.unsupported = Some(acc.to_string());
+                                }
                                 _ => {
                                     b.note_label(&cv);
                                     extra_cv.push(cv.clone().with_section(context));

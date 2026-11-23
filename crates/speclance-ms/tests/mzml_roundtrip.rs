@@ -720,3 +720,63 @@ fn run_metadata_has_no_skipped_arrays_key_when_nothing_was_skipped() {
         serde_json::from_str(skipped.run.run_metadata.as_deref().unwrap()).unwrap();
     assert_eq!(meta["skipped_arrays"]["count"], 1);
 }
+
+#[test]
+fn scan_inverse_reduced_mobility_that_is_not_finite_is_kept() {
+    for v in ["nan", "inf", "-inf"] {
+        let bad = INV_K0.replace(r#"value="0.95""#, &format!(r#"value="{v}""#));
+        let data = parse_bytes(&tiny_with_scan_params(&[&bad]), "nonfinite.mzML".into()).unwrap();
+        let s = &data.spectra[0];
+        assert_eq!(s.inv_mobility, None, "{v}");
+        let cv = s.cv_params.as_deref().unwrap();
+        assert!(cv.contains("MS:1002815") && cv.contains(v), "{v}: {cv}");
+        // Export still works: the value is not in the column.
+        let mut out = Vec::new();
+        write_mzml(&mut out, &data.run, &data.spectra, &data.chromatograms).unwrap();
+    }
+}
+
+#[test]
+fn repeated_read_chromatograms_does_not_count_skipped_arrays_twice() {
+    let xml = String::from_utf8(tiny_with_chromatogram(MZ_B64)).unwrap();
+    let xml = xml.replace(
+        r#"</binaryDataArrayList></chromatogram>"#,
+        &format!("{MOBILITY_ARRAY}</binaryDataArrayList></chromatogram>"),
+    );
+    let mut ingest = MzmlIngest::open_bytes(xml.into_bytes(), "twice.mzML".into()).unwrap();
+    while ingest.next_spectrum().unwrap().is_some() {}
+    ingest.read_chromatograms().unwrap();
+    ingest.read_chromatograms().unwrap();
+    assert_eq!(ingest.skipped_array_count(), 1);
+    let summary = ingest.skipped_arrays_summary().unwrap();
+    assert!(summary.contains("skipped 1 "), "{summary}");
+}
+
+const NUMPRESS_LINEAR: &str = r#"<cvParam cvRef="MS" accession="MS:1002312" name="MS-Numpress linear prediction compression"/>"#;
+const NUMPRESS_SLOF: &str = r#"<cvParam cvRef="MS" accession="MS:1002314" name="MS-Numpress short logged float compression"/>"#;
+
+#[test]
+fn numpress_chromatogram_arrays_are_unsupported() {
+    let plain = String::from_utf8(tiny_with_chromatogram(MZ_B64)).unwrap();
+    // A Numpress-flagged time array, then a Numpress-flagged intensity array.
+    let time_flag = r#"<cvParam cvRef="MS" accession="MS:1000595" name="time array"/>"#;
+    let int_flag = r#"<cvParam cvRef="MS" accession="MS:1000515" name="intensity array"/><binary>AABAQAAAoEAAAPBA</binary>"#;
+    let cases = [
+        (
+            time_flag,
+            format!("{NUMPRESS_LINEAR}{time_flag}"),
+            "MS:1002312",
+        ),
+        (int_flag, format!("{NUMPRESS_SLOF}{int_flag}"), "MS:1002314"),
+    ];
+    for (old, new, acc) in cases {
+        assert_eq!(plain.matches(old).count(), 1, "{old}");
+        let xml = plain.replace(old, &new);
+        let err = parse_bytes(xml.as_bytes(), "numpress.mzML".into()).unwrap_err();
+        assert!(
+            matches!(err, speclance_ms::MsError::Unsupported(_)),
+            "{acc}: {err:?}"
+        );
+        assert!(err.to_string().contains(acc), "{err}");
+    }
+}

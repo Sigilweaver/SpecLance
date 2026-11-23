@@ -44,7 +44,7 @@ Implemented:
   `run_metadata` blocks. The output is a valid mzML for the spectra it
   carries, not a copy of the source.
 - **MS-Numpress is not supported.** Ingest stops with an error on any
-  Numpress-encoded array. Only uncompressed and zlib arrays are read.
+  Numpress-encoded array, in a spectrum or a chromatogram. Only uncompressed and zlib arrays are read.
 - **`scan_num` does not always match the source.** For mzML ingest it is
   the spectrum `index` + 1, not the scan number in the nativeID. The
   original nativeID is kept in `native_id`.
@@ -56,7 +56,9 @@ Implemented:
   the vendor's scan number rather than a spectrum index + 1.
 - **Only m/z and intensity arrays are stored.** Other binary data arrays in an mzML spectrum or chromatogram (for
   example a per-peak ion mobility array) are not decoded. Each ingest counts them by array name and reports the count
-  on stderr (CLI and Python), and records it in `runs.run_metadata` under `skipped_arrays`.
+  on stderr (CLI and Python), and records it in `runs.run_metadata` under `skipped_arrays`. The Python report is a plain
+  stderr line, not a `warnings` warning, and an array marked as non-standard data (`MS:1000786`) is counted under its
+  first term, not under its `value=` name.
 - **Intensity is stored as Float32.** A 64-bit intensity array is narrowed on ingest.
 - **Array precision is not used on export.** The writer does not read `mz_precision` or `intensity_precision`, and
   vendor ingest sets them to 64 and 32 rather than a source width.
@@ -64,7 +66,8 @@ Implemented:
   Bruker frame maps to rows.
 - **Drift time is not exported.** `inv_mobility` holds 1/K0 only. A scan-level drift time (`MS:1002476`) is kept in
   `cv_params`, and export does not write `cv_params`. Runs from older mzML ingests can hold a drift time in
-  `inv_mobility`; nothing marks them.
+  `inv_mobility`; nothing marks them. A file whose converter wrote a 1/K0 value under `MS:1002476` gets an empty
+  `inv_mobility`; the value stays in `cv_params` and is not exported.
 - **Vendor scan metadata without a column is dropped.** Thermo filter strings, Waters function types and Bruker
   accumulation times are not stored.
 - **No spectrum-library adapters.** The Python API has no conversion to `spectrum_utils`, `matchms`, `ms2ml`,

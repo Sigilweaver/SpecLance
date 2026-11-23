@@ -88,6 +88,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   counts them by array name, prints the count on stderr (CLI and Python), and
   records it in `runs.run_metadata` as `skipped_arrays`. `MzmlIngest` gains
   `skipped_arrays`, `skipped_array_count` and `skipped_arrays_summary`.
+- An MS-Numpress encoded time or intensity array in an mzML chromatogram was
+  read as raw floats, giving garbage values or a misleading length error. It
+  now stops the ingest with `MsError::Unsupported`, as for spectra.
 - `speclance ingest --help` describes what the command ingests (mzML, and
   vendor files in a build with `--features all-vendors`) instead of saying
   vendor support will be added.
