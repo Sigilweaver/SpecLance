@@ -92,6 +92,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Security
 
+- Updated the locked `url` crate from 2.5.8 to 2.5.9 (and `form_urlencoded`
+  to 1.2.3), fixing RUSTSEC-2026-0592 (stack overflow in `Url::origin()` on
+  nested `blob:` URLs). Lockfile-only change.
 - Updated the locked `opentimstdf` (via `openmassspec-io`) from 3.0.0 to
   3.0.1, which moves `rusqlite` to 0.42 and `libsqlite3-sys` to 0.40.0,
   fixing RUSTSEC-2026-0459 (C SQLite CVE-2026-119375). Lockfile-only change.
