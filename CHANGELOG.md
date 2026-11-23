@@ -125,6 +125,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   site, covering the `speclance` package's `Store` class (`open`,
   `ingest_mzml`, `create_default_indexes`, `runs`, `query_window`,
   `chromatograms`). (#2, contributed by @Nabejo)
+- Corrected the README, the docs introduction and the Python API page to match
+  the current CLI and Python API. They no longer call SpecLance a drop-in mzML
+  replacement or list `xic` and `compare` commands, `query` flags that do not
+  exist (`--rt 30..35 --mz ...`), a `Store.query(rt=..., mz=...)` method,
+  PyArrow / Polars / Pandas output, or a `pip install speclance` package. They
+  now describe `run_id` as derived from the path and size, list the supported
+  vendor formats and the `all-vendors` build feature, and have one Known issues
+  section covering the lossy export, MS-Numpress, `scan_num`, array precision and ion
+  mobility. The README's design section is now "Implementation Notes" and
+  states only current behavior.
 
 ## [0.2.0-alpha] - 2026-05-31
 
