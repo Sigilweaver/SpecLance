@@ -6,8 +6,9 @@ sidebar_position: 1
 
 The `speclance` wheel (built with PyO3 + maturin) exposes a synchronous
 `Store` facade over the Rust core. Each call blocks on an internal Tokio
-runtime, so no `async`/`await` is required on the Python side. Install it
-with `pip install speclance`.
+runtime, so no `async`/`await` is required on the Python side. Build and
+install it from a checkout with `maturin develop --release` in
+`crates/speclance-py` (Python 3.9 or newer).
 
 ```python
 import speclance
@@ -44,8 +45,9 @@ run_id = store.ingest_mzml("path/to/run.mzML")
 
 ### `create_default_indexes()`
 
-Builds the default scalar indexes (used to accelerate `query_window`).
-Call this once after ingesting, before querying:
+Builds the default scalar indexes (BTree on `run_id`, `scan_num`, and `rt`,
+Bitmap on `ms_level`) to accelerate `query_window`. Call it once after
+ingesting:
 
 ```python
 store.create_default_indexes()
