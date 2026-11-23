@@ -140,7 +140,8 @@ async fn begin_ingest(store: &Store, run_id: &str) -> Result<()> {
 
 /// After `err` stopped an ingest of `run_id`, delete the rows it already
 /// wrote and return `err`. If the cleanup fails too, both errors are in the
-/// returned chain.
+/// returned chain. If another writer committed the run in the meantime, its
+/// rows are left in place and the error says so.
 async fn abort_ingest(store: &Store, run_id: &str, err: anyhow::Error) -> anyhow::Error {
     match store.discard_unfinished_run(run_id).await {
         Ok(0) => err,
@@ -148,6 +149,9 @@ async fn abort_ingest(store: &Store, run_id: &str, err: anyhow::Error) -> anyhow
             eprintln!("  removed {removed} rows of run {run_id} written before the failure");
             err
         }
+        Err(speclance_core::Error::RunExists(_)) => err.context(format!(
+            "run {run_id} was committed by another writer; the rows written for it were left in place"
+        )),
         Err(cleanup) => err.context(format!(
             "ingest failed, and removing the rows already written for run {run_id} also failed: {cleanup}"
         )),

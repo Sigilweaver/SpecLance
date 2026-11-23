@@ -128,6 +128,9 @@ impl PyStore {
                         }
                         Err(e)
                     }
+                    Err(speclance_core::Error::RunExists(_)) => Err(PyIOError::new_err(format!(
+                        "{e}; run {run_id} was committed by another writer, so the rows written for it were left in place"
+                    ))),
                     Err(cleanup) => Err(PyIOError::new_err(format!(
                         "{e}; removing the rows already written for run {run_id} also failed: {cleanup}"
                     ))),

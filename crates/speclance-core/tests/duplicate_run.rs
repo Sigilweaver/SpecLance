@@ -159,3 +159,23 @@ async fn discard_unfinished_run_refuses_a_run_that_has_a_run_row() {
         .sum();
     assert_eq!(kept, 1);
 }
+
+#[tokio::test]
+async fn discard_unfinished_run_handles_a_quote_in_the_run_id() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Store::open(tmp.path().to_str().unwrap()).await.unwrap();
+    let tricky = "o'brien";
+    store
+        .append_spectra(&[spectrum(tricky, 1), spectrum("obrien", 1)])
+        .await
+        .unwrap();
+    assert_eq!(store.discard_unfinished_run(tricky).await.unwrap(), 1);
+    let kept: usize = store
+        .read_spectra("obrien")
+        .await
+        .unwrap()
+        .iter()
+        .map(|b| b.num_rows())
+        .sum();
+    assert_eq!(kept, 1);
+}

@@ -105,7 +105,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   blocks a retry of the same file: ingest deletes the spectra and
   chromatograms of that `run_id` that have no run row (reporting how many on
   stderr), and a failure removes the rows it had already written.
-  `Store::discard_unfinished_run` does the deletion.
+  `Store::discard_unfinished_run` does the deletion. Two processes that ingest
+  the same file into the same store at once are not coordinated: one can delete
+  rows the other wrote, which can leave a run row with missing spectra.
 - An mzML spectrum whose `index` attribute is not a number returns
   `MsError::Malformed` instead of being read as scan 1.
 - Vendor ingest returns the I/O error when the size of a vendor file or
