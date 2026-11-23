@@ -51,6 +51,9 @@ async fn write_mzml_rows(store: &CoreStore, mut ingest: MzmlIngest) -> PyResult<
     let chromatograms = ingest
         .read_chromatograms()
         .map_err(|e| PyIOError::new_err(format!("parse chromatograms: {e}")))?;
+    if let Some(skipped) = ingest.skipped_arrays_summary() {
+        eprintln!("{skipped}");
+    }
     let run = ingest
         .finalize_run(total, ms1, ms2)
         .map_err(|e| PyIOError::new_err(format!("finalize run: {e}")))?;

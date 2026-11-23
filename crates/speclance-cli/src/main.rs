@@ -19,12 +19,17 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     /// Ingest one or more files into a SpecLance store.
+    ///
+    /// A file whose run is already in the store is refused. Progress and
+    /// a count of any skipped binary data arrays go to stderr.
     Ingest {
         /// Path to the SpecLance store directory.
         #[arg(long)]
         store: String,
-        /// Input file(s): .mzML (Thermo/Bruker/Waters vendor support
-        /// added in later versions).
+        /// Input file(s): .mzML, or with a build that has --features
+        /// all-vendors also a vendor file or directory (Thermo .raw,
+        /// Bruker .d, Waters .raw, Agilent .d, SCIEX .wiff, Shimadzu
+        /// .lcd/.qgd).
         #[arg(required = true)]
         inputs: Vec<String>,
     },
@@ -33,7 +38,8 @@ enum Cmd {
         #[arg(long)]
         store: String,
     },
-    /// Export a run back to mzML.
+    /// Export a run back to mzML. Writes spectra only; chromatograms in the
+    /// store are not exported.
     Export {
         #[arg(long)]
         store: String,
@@ -198,6 +204,7 @@ async fn stream_mzml_rows(store: &Store, mut ingest: MzmlIngest, run_id: &str) -
         buf.clear();
     }
     let chromatograms = ingest.read_chromatograms().context("parse chromatograms")?;
+    let skipped_summary = ingest.skipped_arrays_summary();
     let run = ingest
         .finalize_run(total, ms1, ms2)
         .context("finalize run")?;
@@ -207,6 +214,9 @@ async fn stream_mzml_rows(store: &Store, mut ingest: MzmlIngest, run_id: &str) -
         chromatograms.len(),
         run_id
     );
+    if let Some(skipped) = skipped_summary {
+        eprintln!("  {skipped}");
+    }
     if !chromatograms.is_empty() {
         store.append_chromatograms(&chromatograms).await?;
     }
@@ -294,12 +304,22 @@ async fn cmd_export(store: &str, run_id: &str, out: &str) -> Result<()> {
     let mut file = std::fs::File::create(&path)?;
     write_mzml(&mut file, &run, &spectra, &chromatograms)?;
     eprintln!(
-        "wrote {} spectra and {} chromatograms -> {}",
-        spectra.len(),
-        chromatograms.len(),
-        path.display()
+        "{}",
+        export_summary(spectra.len(), chromatograms.len(), &path)
     );
     Ok(())
+}
+
+/// What `export` reports: the spectra written, and the chromatograms in the
+/// store that were not written (the writer is spectrum-only).
+fn export_summary(spectra: usize, chromatograms: usize, path: &Path) -> String {
+    let mut msg = format!("wrote {} spectra -> {}", spectra, path.display());
+    if chromatograms > 0 {
+        msg.push_str(&format!(
+            "; the run has {chromatograms} chromatograms, which are not exported"
+        ));
+    }
+    msg
 }
 
 async fn cmd_index(store: &str) -> Result<()> {
@@ -355,6 +375,27 @@ async fn cmd_query(
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod export_tests {
+    use super::*;
+
+    #[test]
+    fn export_summary_names_only_what_was_written() {
+        let out = Path::new("out.mzML");
+        assert_eq!(export_summary(3, 0, out), "wrote 3 spectra -> out.mzML");
+    }
+
+    #[test]
+    fn export_summary_says_chromatograms_are_not_exported() {
+        let out = Path::new("out.mzML");
+        let msg = export_summary(3, 2, out);
+        assert!(msg.starts_with("wrote 3 spectra -> out.mzML"), "{msg}");
+        assert!(msg.contains("2 chromatograms"), "{msg}");
+        assert!(msg.contains("not exported"), "{msg}");
+        assert!(!msg.contains("wrote 3 spectra and"), "{msg}");
+    }
 }
 
 #[cfg(all(test, feature = "vendors"))]
