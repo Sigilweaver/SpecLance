@@ -67,9 +67,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   way; it was read as `None` before.
 - `speclance_core::Error` is `#[non_exhaustive]`, so a new variant is no longer
   a breaking change.
+- Packaging (#36): `speclance-core`, `speclance-ms` and `speclance-py` each
+  ship a copy of `LICENSE` (the Python sdist includes it), `speclance-core` has
+  a README, `speclance-ms` uses the root README, `speclance-cli` and
+  `speclance-py` are `publish = false`, `speclance-py` excludes `.gitignore`
+  from its package, and the README's license link is absolute.
 
 ### Fixed
 
+- The mzML reader stored the scan-level `MS:1002476` (ion mobility drift
+  time, milliseconds) in `inv_mobility`, the 1/K0 column, so a drift time
+  was exported as `MS:1002815` (inverse reduced ion mobility). `inv_mobility`
+  is now read from `MS:1002815`, which is the term `openmassspec-core` writes
+  for a Bruker scan; `MS:1002476` and a `MS:1002815` value that is not a number
+  stay in `cv_params`. Runs ingested from mzML before this change can hold a
+  drift time in `inv_mobility`; there is no marker to tell them apart, so
+  re-ingest such a file into a new store.
+- The mzML reader skipped binary data arrays that are not m/z or intensity
+  (time and intensity for chromatograms) without a trace. Each ingest now
+  counts them by array name, prints the count on stderr (CLI and Python), and
+  records it in `runs.run_metadata` as `skipped_arrays`. `MzmlIngest` gains
+  `skipped_arrays`, `skipped_array_count` and `skipped_arrays_summary`.
+- `speclance ingest --help` describes what the command ingests (mzML, and
+  vendor files in a build with `--features all-vendors`) instead of saying
+  vendor support will be added.
+- `speclance export` printed "wrote N spectra and M chromatograms" although the
+  writer does not export chromatograms. It prints the spectra written and, if
+  the run has chromatograms, says they are not exported.
 - The mzML reader no longer drops character references (for example `&#10;`)
   and CDATA sections inside `<binary>` elements; they are now part of the
   base64 text, and whitespace in the base64 is ignored when decoding. An
