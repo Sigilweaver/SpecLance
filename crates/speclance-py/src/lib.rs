@@ -57,6 +57,7 @@ impl PyStore {
             let mut ingest = MzmlIngest::open(Path::new(&p))
                 .map_err(|e| PyIOError::new_err(format!("open mzml: {e}")))?;
             let run_id = ingest.run_id().to_string();
+            store.ensure_run_absent(&run_id).await.map_err(map_err)?;
             let mut buf = Vec::with_capacity(SPECTRUM_CHUNK);
             let mut total = 0u32;
             let mut ms1 = 0u32;
@@ -124,7 +125,7 @@ impl PyStore {
                 Ok(batches)
             })
             .map_err(map_err)?;
-        let runs = batches_to_runs(&batches);
+        let runs = batches_to_runs(&batches).map_err(map_err)?;
         let list = PyList::empty(py);
         for r in runs {
             let d = PyDict::new(py);
@@ -170,7 +171,7 @@ impl PyStore {
                     .await
             })
             .map_err(map_err)?;
-        let mut spectra = batches_to_spectra(&batches);
+        let mut spectra = batches_to_spectra(&batches).map_err(map_err)?;
         if let Some(n) = limit {
             spectra.truncate(n);
         }
@@ -200,7 +201,7 @@ impl PyStore {
             .rt
             .block_on(async move { store.read_chromatograms(&run_id_owned).await })
             .map_err(map_err)?;
-        let chroms = batches_to_chromatograms(&batches);
+        let chroms = batches_to_chromatograms(&batches).map_err(map_err)?;
         let list = PyList::empty(py);
         for c in chroms {
             let d = PyDict::new(py);

@@ -97,3 +97,17 @@ def test_ingest_index_query_roundtrip(tmp_path):
 def test_store_repr(tmp_path):
     store = speclance.Store.open(str(tmp_path / "store"))
     assert "speclance.Store" in repr(store)
+
+
+def test_reingest_same_run_is_rejected(tmp_path):
+    mzml_path = tmp_path / "tiny.mzML"
+    mzml_path.write_text(TINY_MZML)
+
+    store = speclance.Store.open(str(tmp_path / "store"))
+    run_id = store.ingest_mzml(str(mzml_path))
+    with pytest.raises(OSError, match="already in this store"):
+        store.ingest_mzml(str(mzml_path))
+
+    runs = store.runs()
+    assert len(runs) == 1
+    assert len(store.query_window(run_id)) == 1

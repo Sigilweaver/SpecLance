@@ -60,7 +60,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   already used by the release workflow. Verified with a local build
   and test pass on Linux; the macOS/Windows runs have not been
   observed in Actions yet.
-
+- `batches_to_runs`, `batches_to_spectra` and `batches_to_chromatograms` in
+  `speclance-core` return `Result` and report a missing or mistyped column as
+  `Error::Schema` instead of panicking. Callers add `?` or handle the error.
+- `speclance_core::Error` is `#[non_exhaustive]`, so a new variant is no longer
+  a breaking change.
 
 ### Fixed
 
@@ -89,6 +93,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Vendor ingest stores short activation names (`SID`, `MPID` and `EThcD`
   included) instead of mzML term names, so they are no longer written as
   `HCD` or `ETD`.
+- Ingesting a run that is already in the store fails with the new
+  `Error::RunExists` (a Python `OSError`) before any row is written, instead
+  of appending a second copy of its rows that exported as invalid mzML.
+  `Store::contains_run` and `Store::ensure_run_absent` expose the check, and
+  `Store::append_run` rejects an existing `run_id`. The check also covers
+  spectra left behind by an interrupted streaming ingest.
 
 ### Security
 
