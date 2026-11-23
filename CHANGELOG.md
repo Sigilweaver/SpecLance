@@ -129,7 +129,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   PyArrow / Polars / Pandas output, or a `pip install speclance` package. They
   now describe `run_id` as derived from the path and size, list the supported
   vendor formats and the `all-vendors` build feature, and have one Known issues
-  section covering the lossy export, MS-Numpress and `scan_num`.
+  section covering the lossy export, MS-Numpress, `scan_num`, array precision and ion
+  mobility. The README's design section is now "Implementation Notes" and
+  states only current behavior.
 
 ## [0.2.0-alpha] - 2026-05-31
 

@@ -53,6 +53,8 @@ only.
   scan number. The nativeID is kept in `native_id`.
 - `run_id` is derived from the source path and file size, so the same file
   reached by a different path gets a different `run_id`.
+- The mzML activation names `PD`, `SID`, `HCD`, `EThcD`, `ETD`, `MPD` and `MPID` do not
+  all roundtrip; the README lists each case.
 - Queries filter on run, retention time, and MS level. There is no m/z
   query and no cross-run query.
 

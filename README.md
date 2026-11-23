@@ -53,6 +53,20 @@ Implemented:
 - **Vendor ingest stores less than mzML ingest.** It writes no
   chromatograms, no `cv_params`, and no `run_metadata`, and `scan_num` is
   the vendor's scan number rather than a spectrum index + 1.
+- **Only m/z and intensity arrays are stored.** Other binary data arrays in an mzML spectrum are not read.
+- **Intensity is stored as Float32.** A 64-bit intensity array is narrowed on ingest.
+- **Array precision is not used on export.** The writer does not read `mz_precision` or `intensity_precision`, and
+  vendor ingest sets them to 64 and 32 rather than a source width.
+- **Ion mobility is one value per spectrum.** There is no per-peak mobility column and no ingest option for how a
+  Bruker frame maps to rows.
+- **Vendor scan metadata without a column is dropped.** Thermo filter strings, Waters function types and Bruker
+  accumulation times are not stored.
+- **No spectrum-library adapters.** The Python API has no conversion to `spectrum_utils`, `matchms`, `ms2ml`,
+  `pyOpenMS` or `pyteomics` objects.
+- **Memory use.** mzML ingest reads the whole source file into memory, vendor ingest holds the whole run, and export
+  loads every spectrum of the run.
+- **Roundtrip tests are narrow.** They re-read the exported mzML with SpecLance's own reader and compare spectrum
+  count and selected fields. There is no independent parser, and no fixture has Numpress arrays.
 - **The Python package ingests mzML only.** Vendor ingest is in the CLI.
 - **`query` reads one run at a time.** There is no cross-run query, XIC, or
   comparison command.
@@ -61,10 +75,11 @@ Implemented:
 - **No PyArrow / Polars output.** The Python API returns `dict`s and lists.
 - All runs share one set of tables; there is no per-run dataset layout.
 - mzML activation roundtrip is lossy in these cases:
-  - `PD` cannot be written until SpecLance moves to an `openmassspec-core` release that writes it (3.0.0 writes no
-    term for it); the writer returns `MsError::Unsupported`.
-  - Stores ingested through the vendor path before short names were stored hold long activation names. `SID` and
-    `HCD` share one long name and read as `HCD`; `EThcD` and `ETD` share one and read as `ETD`.
+  - `PD` is not written. The writer returns `MsError::Unsupported` for a spectrum whose activation is `PD`,
+    because `openmassspec-core` 3.0.0 writes no term for it.
+  - Older vendor-ingested stores hold long activation names. The reader parses them (`parse_activation` accepts the
+    short names, these long names and other PSI-MS term names), but `SID` and `HCD` share one long name and read as
+    `HCD`, and `EThcD` and `ETD` share one and read as `ETD`.
   - `HCD` is written as `MS:1000422` (beam-type CID), so a file read with `MS:1002481` (higher energy beam-type CID),
     alone or together with `MS:1000422`, is written back with `MS:1000422` only.
   - ETD with `MS:1002678` (supplemental beam-type CID) reads as `EThcD` and is written back as ETD with `MS:1002631`
@@ -112,9 +127,9 @@ There are three usage modes:
    pipelines.
 3. **Export to mzML.** Write a run from a SpecLance store back out as mzML.
    This carries spectra and their typed fields only; chromatograms, extra CV
-   params, and run-level metadata are not written. A lossless
-   `mzML -> SpecLance -> mzML` roundtrip is the design target (see
-   [Design Notes](#design-notes)) and is not met.
+   params, and run-level metadata are not written. The
+   `mzML -> SpecLance -> mzML` roundtrip is not lossless (see
+   [Known issues](#known-issues)).
 
 ## Why Not mzML?
 
@@ -217,13 +232,13 @@ is self-contained and can be retrieved atomically.
 | activation               | Utf8                | HCD / CID / ECD / ETD / ...       |
 | collision_energy         | Float32             |                                   |
 | inv_mobility             | Float64             | Bruker 1/K0; null for other vendors|
-| mz_precision             | UInt8               | 32 or 64 - original storage width |
-| intensity_precision      | UInt8               | 32 or 64 - original storage width |
+| mz_precision             | UInt8               | 32 or 64 - source array width     |
+| intensity_precision      | UInt8               | 32 or 64 - source array width     |
+| scan_window_lower        | Float64             |                                   |
+| scan_window_upper        | Float64             |                                   |
 | mz                       | LargeList<Float64>  | peak m/z values                   |
 | intensity                | LargeList<Float32>  | peak intensity values             |
 | cv_params                | Utf8 (JSON)         | other CV params; not exported     |
-| scan_window_lower        | Float64             |                                   |
-| scan_window_upper        | Float64             |                                   |
 
 ### `chromatograms` table
 
@@ -242,143 +257,83 @@ They are stored on mzML ingest and are not written on export.
 | intensity      | LargeList<Float32> | intensity axis                         |
 | cv_params      | Utf8 (JSON)        | all chromatogram-level CV params       |
 
-## Design Notes
+## Implementation Notes
 
-This section is the design for a lossless mzML replacement. It describes
-the target, not current behavior. Where they differ, the current state is
-noted; [Known issues](#known-issues) is authoritative.
+How the store handles the parts of mzML that do not map to a typed column.
+Gaps against a lossless roundtrip are listed in [Known issues](#known-issues).
 
-### 1. CV term completeness
+### 1. CV terms
 
-mzML is governed by the PSI-MS OBO ontology, which defines over 1,000
-controlled vocabulary terms covering instrument components, scan types, data
-transformations, activation methods, and more. Any schema that hard-codes only
-the common terms will silently drop the rest on ingest, making a lossless
-roundtrip impossible.
+Typed Arrow columns hold the terms researchers filter on: MS level, retention
+time, TIC, base peak, polarity, centroid flag, the precursor fields,
+activation, collision energy, `inv_mobility`, the scan window and the array
+precision. On mzML ingest, every other `cvParam` and `userParam` of a spectrum
+is serialized as JSON into `spectra.cv_params`, together with the XML section
+it appeared in; the column is null when there are none. Activation terms that
+the `activation` name accounts for are not repeated there. Vendor ingest
+leaves `cv_params` null.
 
-**Approach:** Use a hybrid strategy. Map the ~30 terms that researchers
-routinely query (ms level, RT, precursor m/z, charge, activation, polarity,
-centroid flag) to typed Arrow columns so they are fast to filter. Store every
-other CV param for the spectrum as a JSON string in the `cv_params` column.
-In the design, export re-emits the typed columns as CV params and writes
-the `cv_params` blob back out.
-
-The same pattern applies at the run level: the `<fileDescription>`,
+At the run level, `runs.run_metadata` holds the XML text of the mzML header
+(everything before `<spectrumList>`, which includes `<fileDescription>`,
 `<sampleList>`, `<softwareList>`, `<scanSettingsList>`,
-`<instrumentConfigurationList>`, and `<dataProcessingList>` blocks are stored
-as JSON in `runs.run_metadata`.
+`<instrumentConfigurationList>` and `<dataProcessingList>`) and of the footer,
+as a JSON object with the keys `prefix`, `spectrum_list_open`, `inter`,
+`chromatogram_list_open`, `suffix` and `indexed`. The blocks are kept as text
+and are not parsed. Vendor ingest leaves `run_metadata` null.
 
-Current state: ingest stores both blobs, but export writes neither.
+Export builds the mzML from the typed columns through `openmassspec-core`. It
+does not read `cv_params` or `run_metadata`.
 
-### 2. Binary precision preservation
+### 2. Binary precision
 
-mzML binary arrays can be stored as 32-bit or 64-bit IEEE 754 floats, and
-some files use MS-Numpress lossless or lossy integer encodings. Internally,
-SpecLance stores all m/z values as Float64 (sufficient for any precision),
-and the `mz_precision` and `intensity_precision` columns record the original
-bit width. In the design, export downcasts to the original width; the
-current writer does not use these columns.
+`mz` is stored as Float64 and `intensity` as Float32. On mzML ingest,
+`mz_precision` and `intensity_precision` record the width the source array
+declared (32 or 64; 64 when it declares none). Vendor ingest records 64 and 32.
+The writer does not read these columns. MS-Numpress arrays are not supported:
+ingest returns `MsError::Unsupported`.
 
-Current state: MS-Numpress is not supported. Ingest fails on any
-Numpress-encoded array.
+### 3. Ion mobility
 
-### 3. Ion mobility (4D data from Bruker TIMS)
-
-Bruker timsTOF PASEF acquisitions add a full ion mobility dimension. Each
-"frame" in the TDF format is a collection of scans across the TIMS ramp, each
-scan being a TOF spectrum at a specific inverse-mobility (1/K0) value. This
-does not fit the flat mzML spectrum model cleanly.
-
-mzML 1.1.3+ defines a convention for ion mobility (CV term MS:1002476 for
-mean 1/K0, MS:1003008 for scan-level IM arrays), but support across readers
-is inconsistent. There are two representation options:
-
-- **Collapsed (recommended for most workflows):** Sum or select peaks across
-  the mobility dimension at ingest, producing conventional MS1/MS2 spectra
-  with an `inv_mobility` centroid value. Matches what most downstream tools
-  expect.
-- **Expanded (full-fidelity):** Store one row per TIMS scan, with an
-  `inv_mobility` value per row. The `scan_num` + `run_id` + `inv_mobility`
-  tuple uniquely identifies each record. This preserves the full 4D dataset
-  at the cost of row count.
-
-The design selects between them with a `--tims-mode collapsed|expanded`
-ingest flag. Current state: the flag does not exist; Bruker ingest uses
-whatever `openmassspec-io` produces.
+Each spectrum row has one `inv_mobility` value (Float64) and the schema has no
+per-peak mobility column. mzML ingest reads `inv_mobility` from the
+scan-level cvParam `MS:1002476`. Vendor ingest copies the value
+`openmassspec-io` returns, so Bruker rows are whatever frame or PASEF
+precursor records that crate produces. There is no ingest option to choose
+between collapsing and expanding the mobility dimension.
 
 ### 4. Chromatograms
 
-mzML `<chromatogramList>` is routinely populated by instruments with TIC,
-BPC, and SRM/MRM transition traces. It is separate from the spectrum list
-and cannot be mapped into the spectra table without information loss.
-
-The `chromatograms` table above addresses this. On mzML ingest,
-chromatograms are parsed and written to that table. Current state: export
-does not write a `<chromatogramList>`, because the upstream
-`openmassspec-core` writer is spectrum-only.
+mzML `<chromatogramList>` traces (TIC, BPC, SRM/MRM) are separate from the
+spectrum list. On mzML ingest each `<chromatogram>` is parsed into the
+`chromatograms` table (see above); vendor ingest produces none. Export writes
+no `<chromatogramList>` because the `openmassspec-core` writer is
+spectrum-only.
 
 ### 5. Data processing lineage
 
-mzML documents record what software transformations have been applied to the
-data (centroiding, deisotoping, denoising, calibration) in a
-`<dataProcessingList>`. This block affects how consumers interpret the data
-(e.g., whether to apply their own centroiding) and must be preserved.
+The `<dataProcessingList>` of an mzML file is stored as part of the
+`run_metadata` header text. It is not parsed and export does not write it.
 
-The `run_metadata` JSON column stores the full `<dataProcessingList>` XML
-fragment. Current state: export does not write it back.
+### 6. Vendor metadata
 
-### 6. Vendor metadata beyond mzML
+Vendor ingest maps the `SpectrumRecord` fields that have a column (see the
+`spectra` table) and nothing else. Thermo filter strings, Waters function
+types and Bruker accumulation times have no column and are not stored.
 
-The vendor readers expose metadata that does not have a direct mzML CV
-term mapping: Thermo filter strings (`FTMS + p ESI Full ms [300.00-1500.00]`),
-Waters function types, Bruker accumulation times. This information is useful
-for debugging and for re-creating accurate mzML output.
+### 7. Python
 
-In the design, source-specific scan metadata goes into the `cv_params`
-JSON column under a `vendor:` prefix and is emitted as `<userParam>` on
-export. Current state: not implemented.
+The [Python API](https://sigilweaver.app/speclance/docs/guide/python-api)
+returns `dict`s whose `mz` and `intensity` are lists of floats. There are no
+adapters to the spectrum objects of `spectrum_utils`, `matchms`, `ms2ml`,
+`pyOpenMS` or `pyteomics`; the caller converts the lists.
 
-### 7. Library interoperability (Python)
+### 8. Large files
 
-The primary consumer surface is Python. The most widely-used spectrum
-libraries - `spectrum_utils`, `matchms`, `ms2ml`, `pyOpenMS`, `pyteomics` -
-each define their own spectrum object. None of them read Lance natively.
-
-The design target is adapters that return each library's spectrum object
-(for example `spectrum_utils`' `MsmsSpectrum` or a `matchms.Spectrum`) by
-copying the Arrow columns directly. Current state: no adapters exist. The
-[Python API](https://sigilweaver.app/speclance/docs/guide/python-api) returns
-`dict`s whose `mz` and `intensity` are lists of floats, and the caller
-converts them.
-
-### 8. Large file streaming
-
-A single Orbitrap run can be 1-2 GB of mzML; a full timsTOF PASEF experiment
-can exceed 20 GB. Loading everything into RAM before writing is not feasible.
-
-mzML ingest streams spectra in batches of 2,048 and writes each batch as a
-Lance fragment. Vendor ingest is buffered: `openmassspec-io` returns the
-whole run in memory before it is written.
-
-### 9. Roundtrip correctness
-
-In the design, a lossless mzML -> SpecLance -> mzML roundtrip is the
-primary correctness guarantee. Current state: it is not met (see above),
-and the tests only check spectrum count and key spectrum fields. A full
-test suite would cover real mzML files spanning:
-
-- Thermo Orbitrap (DDA and DIA)
-- Bruker timsTOF PASEF
-- Waters HDMS (ion mobility)
-- SRM/MRM files with chromatogram lists
-- Files with both 32-bit and 64-bit arrays
-- Files with Numpress-encoded arrays
-- Files with unusual or instrument-vendor-specific CV terms
-
-That suite would parse the exported mzML with an independent parser
-(e.g., `mzdata` or `psims`) and assert equality of spectrum count, CV params,
-retention times, precursor values, and peak arrays to within floating-point
-precision of the original storage width.
+mzML ingest reads the whole source file into memory, then parses spectra one at
+a time and appends them to the store in batches of 2,048 (CLI and Python).
+Vendor ingest is buffered: `openmassspec-io` returns the whole run in memory,
+which is then appended in batches of 2,048. Export loads every spectrum of the
+run into memory before writing.
 
 ## Dependency Map
 
