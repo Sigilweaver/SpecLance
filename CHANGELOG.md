@@ -99,6 +99,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `Store::contains_run` and `Store::ensure_run_absent` expose the check, and
   `Store::append_run` rejects an existing `run_id`. The check also covers
   spectra left behind by an interrupted streaming ingest.
+- An mzML spectrum whose `index` attribute is not a number returns
+  `MsError::Malformed` instead of being read as scan 1.
+- Vendor ingest returns the I/O error when the size of a vendor file or
+  directory cannot be read, instead of using a smaller size and so a different
+  `run_id`.
 
 ### Security
 

@@ -1,10 +1,9 @@
 //! Vendor ingest: a single entry point that handles every supported
 //! vendor format via [`openmassspec_io`].
 //!
-//! Replaces the per-vendor `thermo.rs`, `bruker.rs`, `waters.rs` adapters.
-//! Each of those used to talk directly to its vendor crate and decode peak
-//! arrays itself; this module delegates to `openmassspec_io::collect` which
-//! drives the canonical `SpectrumSource` implementation for each vendor.
+//! This module does not decode vendor bytes itself; it delegates to
+//! `openmassspec_io::collect`, which drives the canonical `SpectrumSource`
+//! implementation for each vendor.
 //!
 //! No mzML intermediate is produced - vendor records (`SpectrumRecord`) are
 //! converted directly into SpecLance [`Spectrum`] / [`Run`] rows. This saves
@@ -51,7 +50,7 @@ pub fn ingest<P: AsRef<Path>>(path: P) -> MsResult<MzmlData> {
     };
 
     let source_path = detected.path.to_string_lossy().to_string();
-    let size = path_size(&detected.path);
+    let size = path_size(&detected.path)?;
     let run_id = derive_run_id(&source_path, size);
 
     let (records, meta) = openmassspec_io::collect(&detected)
@@ -180,23 +179,21 @@ fn record_to_spectrum(run_id: &str, rec: &SpectrumRecord) -> Spectrum {
 
 /// Total bytes on disk for a vendor bundle. Handles both single-file
 /// (Thermo `.raw`) and directory (Bruker `.d/`, Waters `.raw/`) layouts.
-fn path_size(path: &Path) -> u64 {
-    if let Ok(meta) = std::fs::metadata(path) {
-        if meta.is_file() {
-            return meta.len();
-        }
+/// The size feeds the run ID, so an unreadable path or entry is an error
+/// rather than a silently smaller total.
+fn path_size(path: &Path) -> MsResult<u64> {
+    let meta = std::fs::metadata(path)?;
+    if meta.is_file() {
+        return Ok(meta.len());
     }
     let mut total = 0u64;
-    if let Ok(rd) = std::fs::read_dir(path) {
-        for entry in rd.flatten() {
-            if let Ok(meta) = entry.metadata() {
-                if meta.is_file() {
-                    total += meta.len();
-                }
-            }
+    for entry in std::fs::read_dir(path)? {
+        let meta = entry?.metadata()?;
+        if meta.is_file() {
+            total += meta.len();
         }
     }
-    total
+    Ok(total)
 }
 
 /// Stable run identifier derived from the source path and total bundle size.
@@ -212,4 +209,25 @@ fn derive_run_id(source_path: &str, size: u64) -> String {
         out.push_str(&format!("{:02x}", b));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn path_size_sums_files_in_a_bundle_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.bin"), [0u8; 10]).unwrap();
+        std::fs::write(dir.path().join("b.bin"), [0u8; 5]).unwrap();
+        assert_eq!(path_size(dir.path()).unwrap(), 15);
+        assert_eq!(path_size(&dir.path().join("a.bin")).unwrap(), 10);
+    }
+
+    #[test]
+    fn path_size_reports_a_missing_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = path_size(&dir.path().join("absent.raw")).unwrap_err();
+        assert!(matches!(err, MsError::Io(_)), "{err}");
+    }
 }
