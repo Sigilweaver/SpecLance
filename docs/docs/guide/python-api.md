@@ -43,6 +43,11 @@ the CLI, then appends the resulting run and any chromatograms.
 run_id = store.ingest_mzml("path/to/run.mzML")
 ```
 
+Ingesting a file whose run is already in the store raises `OSError` (the
+core error is `RunExists`) and writes nothing. Binary data arrays other than
+m/z and intensity are not stored; their count is printed to stderr and
+recorded in the run's `run_metadata` as `skipped_arrays`.
+
 ### `create_default_indexes()`
 
 Builds the default scalar indexes (BTree on `run_id`, `scan_num`, and `rt`,

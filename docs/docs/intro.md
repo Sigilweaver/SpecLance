@@ -48,7 +48,9 @@ only.
 
 - mzML export is lossy: it writes spectra only, without chromatograms,
   extra CV params, or run-level metadata. Keep your source files.
-- MS-Numpress encoded arrays are not supported; ingest fails on them.
+- MS-Numpress encoded arrays, in spectra or chromatograms, are not supported; ingest fails on them.
+- Only m/z and intensity arrays are stored. Ingest counts the other binary
+  data arrays it skips and reports the count on stderr.
 - For mzML ingest, `scan_num` is the spectrum index + 1, not the source
   scan number. The nativeID is kept in `native_id`.
 - `run_id` is derived from the source path and file size, so the same file

@@ -145,3 +145,35 @@ def test_failed_ingest_leaves_no_rows_and_the_file_can_be_retried(tmp_path):
     run_id = store.ingest_mzml(str(mzml_path))
     assert len(store.runs()) == 1
     assert len(store.query_window(run_id)) == 2050
+
+
+def test_ingest_reports_skipped_arrays_on_stderr(tmp_path, capfd):
+    # An mzML spectrum with a mean ion mobility array: only m/z and
+    # intensity are stored, and the skipped array is counted on stderr.
+    mobility = """<binaryDataArray encodedLength="16">
+            <cvParam cvRef="MS" accession="MS:1000521" name="32-bit float"/>
+            <cvParam cvRef="MS" accession="MS:1000576" name="no compression"/>
+            <cvParam cvRef="MS" accession="MS:1002816" name="mean ion mobility array"/>
+            <binary>AABAQAAAoEAAAPBA</binary>
+          </binaryDataArray>
+        </binaryDataArrayList>"""
+    xml = TINY_MZML.replace("</binaryDataArrayList>", mobility, 1)
+    mzml_path = tmp_path / "mobility.mzML"
+    mzml_path.write_text(xml)
+
+    store = speclance.Store.open(str(tmp_path / "store"))
+    run_id = store.ingest_mzml(str(mzml_path))
+    err = capfd.readouterr().err
+    assert (
+        "skipped 1 binary data arrays that are not m/z or intensity "
+        "(mean ion mobility array: 1)" in err
+    ), err
+    assert len(store.query_window(run_id)) == 1
+
+
+def test_ingest_without_skipped_arrays_reports_none(tmp_path, capfd):
+    mzml_path = tmp_path / "tiny.mzML"
+    mzml_path.write_text(TINY_MZML)
+    store = speclance.Store.open(str(tmp_path / "store"))
+    store.ingest_mzml(str(mzml_path))
+    assert "skipped" not in capfd.readouterr().err

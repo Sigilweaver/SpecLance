@@ -1,6 +1,6 @@
 //! Roundtrip tests for the mzML reader and writer.
 
-use speclance_ms::mzml::{parse_bytes, read_mzml, write_mzml};
+use speclance_ms::mzml::{parse_bytes, read_mzml, write_mzml, MzmlIngest};
 
 const TINY_MZML: &str = r#"<?xml version="1.0" encoding="utf-8"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" version="1.1.0" id="tiny">
@@ -530,4 +530,253 @@ fn malformed_spectrum_index_is_an_error() {
     let xml = TINY_MZML.replace(r#"index="0" id="scan=1""#, r#"index="x" id="scan=1""#);
     let err = parse_bytes(xml.as_bytes(), "bad-index.mzML".into()).unwrap_err();
     assert!(err.to_string().contains("spectrum index"), "{err}");
+}
+
+// -- ion mobility terms --
+
+const RT_PARAM: &str = r#"<cvParam cvRef="MS" accession="MS:1000016" name="scan start time" value="1.5" unitCvRef="UO" unitAccession="UO:0000010" unitName="second"/>"#;
+const INV_K0: &str = r#"<cvParam cvRef="MS" accession="MS:1002815" name="inverse reduced ion mobility" value="0.95" unitCvRef="MS" unitAccession="MS:1002814" unitName="volt-second per square centimeter"/>"#;
+const DRIFT_TIME: &str = r#"<cvParam cvRef="MS" accession="MS:1002476" name="ion mobility drift time" value="12.5" unitCvRef="UO" unitAccession="UO:0000028" unitName="millisecond"/>"#;
+
+fn tiny_with_scan_params(params: &[&str]) -> Vec<u8> {
+    TINY_MZML
+        .replace(RT_PARAM, &format!("{RT_PARAM}{}", params.concat()))
+        .into_bytes()
+}
+
+fn cv_params_json(s: &speclance_core::Spectrum) -> serde_json::Value {
+    serde_json::from_str(s.cv_params.as_deref().expect("cv_params recorded")).unwrap()
+}
+
+#[test]
+fn scan_inverse_reduced_mobility_fills_inv_mobility() {
+    let data = parse_bytes(&tiny_with_scan_params(&[INV_K0]), "k0.mzML".into()).unwrap();
+    let s = &data.spectra[0];
+    assert_eq!(s.inv_mobility, Some(0.95));
+    // The value has its column; it is not repeated in cv_params.
+    assert!(
+        s.cv_params
+            .as_deref()
+            .is_none_or(|cv| !cv.contains("MS:1002815")),
+        "{:?}",
+        s.cv_params
+    );
+}
+
+#[test]
+fn scan_drift_time_is_not_stored_as_inverse_reduced_mobility() {
+    let data = parse_bytes(&tiny_with_scan_params(&[DRIFT_TIME]), "drift.mzML".into()).unwrap();
+    let s = &data.spectra[0];
+    assert_eq!(s.inv_mobility, None);
+    // The drift time is kept with its unit, in the scan section.
+    let cv = cv_params_json(s);
+    let entry = cv
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["accession"] == "MS:1002476")
+        .expect("drift time kept in cv_params");
+    assert_eq!(entry["section"], "scan");
+    assert_eq!(entry["value"], "12.5");
+    assert_eq!(entry["unit_accession"], "UO:0000028");
+}
+
+#[test]
+fn scan_with_both_mobility_terms_keeps_each_in_its_place() {
+    let data = parse_bytes(
+        &tiny_with_scan_params(&[INV_K0, DRIFT_TIME]),
+        "both.mzML".into(),
+    )
+    .unwrap();
+    let s = &data.spectra[0];
+    assert_eq!(s.inv_mobility, Some(0.95));
+    let cv = s.cv_params.as_deref().unwrap();
+    assert!(
+        cv.contains("MS:1002476") && !cv.contains("MS:1002815"),
+        "{cv}"
+    );
+}
+
+#[test]
+fn scan_inverse_reduced_mobility_that_is_not_a_number_is_kept() {
+    let bad = INV_K0.replace(r#"value="0.95""#, r#"value="n/a""#);
+    let data = parse_bytes(&tiny_with_scan_params(&[&bad]), "badk0.mzML".into()).unwrap();
+    let s = &data.spectra[0];
+    assert_eq!(s.inv_mobility, None);
+    let cv = s.cv_params.as_deref().unwrap();
+    assert!(cv.contains("MS:1002815") && cv.contains("n/a"), "{cv}");
+}
+
+#[test]
+fn export_writes_inverse_reduced_mobility_and_no_drift_time() {
+    let k0 = parse_bytes(&tiny_with_scan_params(&[INV_K0]), "k0.mzML".into()).unwrap();
+    let mut out = Vec::new();
+    write_mzml(&mut out, &k0.run, &k0.spectra, &k0.chromatograms).unwrap();
+    let xml = String::from_utf8(out).unwrap();
+    assert!(xml.contains(r#"accession="MS:1002815""#), "{xml}");
+    let back = parse_bytes(xml.as_bytes(), "k0-back.mzML".into()).unwrap();
+    assert_eq!(back.spectra[0].inv_mobility, Some(0.95));
+
+    // A drift time is not written as 1/K0.
+    let drift = parse_bytes(&tiny_with_scan_params(&[DRIFT_TIME]), "drift.mzML".into()).unwrap();
+    let mut out = Vec::new();
+    write_mzml(&mut out, &drift.run, &drift.spectra, &drift.chromatograms).unwrap();
+    let xml = String::from_utf8(out).unwrap();
+    assert!(!xml.contains("MS:1002815"), "{xml}");
+}
+
+// -- skipped binary data arrays --
+
+const MOBILITY_ARRAY: &str = r#"<binaryDataArray encodedLength="16">
+            <cvParam cvRef="MS" accession="MS:1000521" name="32-bit float"/>
+            <cvParam cvRef="MS" accession="MS:1000576" name="no compression"/>
+            <cvParam cvRef="MS" accession="MS:1002816" name="mean ion mobility array" unitCvRef="MS" unitAccession="MS:1002814" unitName="volt-second per square centimeter"/>
+            <binary>AABAQAAAoEAAAPBA</binary>
+          </binaryDataArray>
+          "#;
+const UNNAMED_ARRAY: &str = r#"<binaryDataArray encodedLength="16">
+            <cvParam cvRef="MS" accession="MS:1000521" name="32-bit float"/>
+            <cvParam cvRef="MS" accession="MS:1000576" name="no compression"/>
+            <binary>AABAQAAAoEAAAPBA</binary>
+          </binaryDataArray>
+          "#;
+
+fn tiny_with_extra_arrays(arrays: &[&str]) -> Vec<u8> {
+    let marker = r#"<binaryDataArray encodedLength="16">"#;
+    TINY_MZML
+        .replace(marker, &format!("{}{marker}", arrays.concat()))
+        .replace(
+            r#"<binaryDataArrayList count="2">"#,
+            &format!(r#"<binaryDataArrayList count="{}">"#, 2 + arrays.len()),
+        )
+        .into_bytes()
+}
+
+#[test]
+fn skipped_arrays_are_counted_by_name_and_recorded_on_the_run() {
+    let xml = tiny_with_extra_arrays(&[MOBILITY_ARRAY, MOBILITY_ARRAY, UNNAMED_ARRAY]);
+    let mut ingest = MzmlIngest::open_bytes(xml, "skip.mzML".into()).unwrap();
+    assert_eq!(ingest.skipped_array_count(), 0);
+    assert_eq!(ingest.skipped_arrays_summary(), None);
+
+    let s = ingest.next_spectrum().unwrap().unwrap();
+    // m/z and intensity are still read.
+    assert_eq!(s.mz, vec![40.0, 50.0, 64.0]);
+    assert_eq!(s.intensity, vec![3.0, 5.0, 7.5]);
+    assert!(ingest.next_spectrum().unwrap().is_none());
+    ingest.read_chromatograms().unwrap();
+
+    let by_array = ingest.skipped_arrays();
+    assert_eq!(by_array.get("mean ion mobility array"), Some(&2));
+    assert_eq!(by_array.get("unnamed array"), Some(&1));
+    assert_eq!(ingest.skipped_array_count(), 3);
+    let summary = ingest.skipped_arrays_summary().unwrap();
+    assert!(
+        summary.contains("skipped 3 binary data arrays"),
+        "{summary}"
+    );
+    assert!(summary.contains("mean ion mobility array: 2"), "{summary}");
+
+    let run = ingest.finalize_run(1, 1, 0).unwrap();
+    let meta: serde_json::Value =
+        serde_json::from_str(run.run_metadata.as_deref().unwrap()).unwrap();
+    assert_eq!(meta["skipped_arrays"]["count"], 3);
+    assert_eq!(
+        meta["skipped_arrays"]["by_array"]["mean ion mobility array"],
+        2
+    );
+    // The verbatim blocks are still there and still read back as `Verbatim`.
+    let verbatim: speclance_ms::mzml::Verbatim = serde_json::from_value(meta).unwrap();
+    assert!(verbatim.prefix.contains("<mzML"));
+}
+
+#[test]
+fn skipped_chromatogram_arrays_are_counted() {
+    let xml = String::from_utf8(tiny_with_chromatogram(MZ_B64)).unwrap();
+    let xml = xml.replace(
+        r#"</binaryDataArrayList></chromatogram>"#,
+        &format!("{MOBILITY_ARRAY}</binaryDataArrayList></chromatogram>"),
+    );
+    let mut ingest = MzmlIngest::open_bytes(xml.into_bytes(), "chrom-skip.mzML".into()).unwrap();
+    while ingest.next_spectrum().unwrap().is_some() {}
+    let chroms = ingest.read_chromatograms().unwrap();
+    assert_eq!(chroms[0].time, vec![40.0, 50.0, 64.0]);
+    assert_eq!(chroms[0].intensity, vec![3.0, 5.0, 7.5]);
+    assert_eq!(
+        ingest.skipped_arrays().get("mean ion mobility array"),
+        Some(&1)
+    );
+}
+
+#[test]
+fn run_metadata_has_no_skipped_arrays_key_when_nothing_was_skipped() {
+    let data = parse_bytes(TINY_MZML.as_bytes(), "tiny.mzML".into()).unwrap();
+    let meta: serde_json::Value =
+        serde_json::from_str(data.run.run_metadata.as_deref().unwrap()).unwrap();
+    assert!(meta.get("skipped_arrays").is_none(), "{meta}");
+
+    let skipped = parse_bytes(&tiny_with_extra_arrays(&[MOBILITY_ARRAY]), "s.mzML".into()).unwrap();
+    let meta: serde_json::Value =
+        serde_json::from_str(skipped.run.run_metadata.as_deref().unwrap()).unwrap();
+    assert_eq!(meta["skipped_arrays"]["count"], 1);
+}
+
+#[test]
+fn scan_inverse_reduced_mobility_that_is_not_finite_is_kept() {
+    for v in ["nan", "inf", "-inf"] {
+        let bad = INV_K0.replace(r#"value="0.95""#, &format!(r#"value="{v}""#));
+        let data = parse_bytes(&tiny_with_scan_params(&[&bad]), "nonfinite.mzML".into()).unwrap();
+        let s = &data.spectra[0];
+        assert_eq!(s.inv_mobility, None, "{v}");
+        let cv = s.cv_params.as_deref().unwrap();
+        assert!(cv.contains("MS:1002815") && cv.contains(v), "{v}: {cv}");
+        // Export still works: the value is not in the column.
+        let mut out = Vec::new();
+        write_mzml(&mut out, &data.run, &data.spectra, &data.chromatograms).unwrap();
+    }
+}
+
+#[test]
+fn repeated_read_chromatograms_does_not_count_skipped_arrays_twice() {
+    let xml = String::from_utf8(tiny_with_chromatogram(MZ_B64)).unwrap();
+    let xml = xml.replace(
+        r#"</binaryDataArrayList></chromatogram>"#,
+        &format!("{MOBILITY_ARRAY}</binaryDataArrayList></chromatogram>"),
+    );
+    let mut ingest = MzmlIngest::open_bytes(xml.into_bytes(), "twice.mzML".into()).unwrap();
+    while ingest.next_spectrum().unwrap().is_some() {}
+    ingest.read_chromatograms().unwrap();
+    ingest.read_chromatograms().unwrap();
+    assert_eq!(ingest.skipped_array_count(), 1);
+    let summary = ingest.skipped_arrays_summary().unwrap();
+    assert!(summary.contains("skipped 1 "), "{summary}");
+}
+
+const NUMPRESS_LINEAR: &str = r#"<cvParam cvRef="MS" accession="MS:1002312" name="MS-Numpress linear prediction compression"/>"#;
+const NUMPRESS_SLOF: &str = r#"<cvParam cvRef="MS" accession="MS:1002314" name="MS-Numpress short logged float compression"/>"#;
+
+#[test]
+fn numpress_chromatogram_arrays_are_unsupported() {
+    let plain = String::from_utf8(tiny_with_chromatogram(MZ_B64)).unwrap();
+    // A Numpress-flagged time array, then a Numpress-flagged intensity array.
+    let time_flag = r#"<cvParam cvRef="MS" accession="MS:1000595" name="time array"/>"#;
+    let int_flag = r#"<cvParam cvRef="MS" accession="MS:1000515" name="intensity array"/><binary>AABAQAAAoEAAAPBA</binary>"#;
+    let cases = [
+        (
+            time_flag,
+            format!("{NUMPRESS_LINEAR}{time_flag}"),
+            "MS:1002312",
+        ),
+        (int_flag, format!("{NUMPRESS_SLOF}{int_flag}"), "MS:1002314"),
+    ];
+    for (old, new, acc) in cases {
+        assert_eq!(plain.matches(old).count(), 1, "{old}");
+        let xml = plain.replace(old, &new);
+        let err = parse_bytes(xml.as_bytes(), "numpress.mzML".into()).unwrap_err();
+        assert!(
+            matches!(err, speclance_ms::MsError::Unsupported(_)),
+            "{acc}: {err:?}"
+        );
+        assert!(err.to_string().contains(acc), "{err}");
+    }
 }

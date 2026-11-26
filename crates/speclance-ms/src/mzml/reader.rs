@@ -21,8 +21,10 @@
 //! reassemble a byte-identical document outside the spectrum and
 //! chromatogram lists.
 
+use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::path::Path;
+use std::sync::Mutex;
 
 use base64::Engine;
 use flate2::read::ZlibDecoder;
@@ -108,6 +110,29 @@ pub struct MzmlIngest {
     body_end: usize,
     cursor: usize,
     chrom_range: Option<(usize, usize)>,
+    /// Binary data arrays that are neither m/z nor intensity (time and
+    /// intensity for chromatograms), by array name. They are not decoded.
+    skipped: Mutex<BTreeMap<String, u64>>,
+    /// The same for the chromatograms of the last `read_chromatograms` call,
+    /// kept apart so that calling it again does not count twice.
+    chrom_skipped: Mutex<BTreeMap<String, u64>>,
+}
+
+/// What `finalize_run` adds to `run_metadata` when arrays were skipped.
+#[derive(Serialize)]
+struct SkippedArraysMeta<'a> {
+    count: u64,
+    by_array: &'a BTreeMap<String, u64>,
+}
+
+/// `run_metadata` as written: the verbatim blocks, plus `skipped_arrays`
+/// when the ingest skipped any binary data array.
+#[derive(Serialize)]
+struct RunMetadataOut<'a> {
+    #[serde(flatten)]
+    verbatim: &'a Verbatim,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    skipped_arrays: Option<SkippedArraysMeta<'a>>,
 }
 
 impl MzmlIngest {
@@ -171,6 +196,8 @@ impl MzmlIngest {
             body_end: spec_list_close,
             cursor: spec_list_open_end + 1,
             chrom_range,
+            skipped: Mutex::new(BTreeMap::new()),
+            chrom_skipped: Mutex::new(BTreeMap::new()),
             bytes,
             source_path,
             run_id,
@@ -217,28 +244,100 @@ impl MzmlIngest {
         let elem_end = start + close_rel + b"</spectrum>".len();
         let xml = std::str::from_utf8(&self.bytes[start..elem_end])
             .map_err(|e| MsError::Malformed(e.to_string()))?;
-        let spec = parse_one_spectrum(xml, &self.run_id)?;
+        let skipped = self
+            .skipped
+            .get_mut()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let spec = parse_one_spectrum(xml, &self.run_id, skipped)?;
         self.cursor = elem_end;
         Ok(Some(spec))
     }
 
     /// Parse all chromatograms in `<chromatogramList>` (or an empty
-    /// vector if absent).
+    /// vector if absent). Binary data arrays other than time and
+    /// intensity are skipped and counted, see
+    /// [`skipped_arrays`](Self::skipped_arrays); a repeated call replaces the
+    /// chromatogram counts instead of adding to them. An array with an
+    /// MS-Numpress term returns `MsError::Unsupported`.
     pub fn read_chromatograms(&self) -> MsResult<Vec<Chromatogram>> {
         match self.chrom_range {
-            Some((s, e)) => parse_chromatograms(&self.bytes[s..e], &self.run_id),
+            Some((s, e)) => {
+                let mut skipped = BTreeMap::new();
+                let result = parse_chromatograms(&self.bytes[s..e], &self.run_id, &mut skipped);
+                *self
+                    .chrom_skipped
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = skipped;
+                result
+            }
             None => Ok(Vec::new()),
         }
     }
 
+    /// Binary data arrays skipped so far, by array name (for example
+    /// `"mean ion mobility array"`). Only m/z and intensity arrays (time and
+    /// intensity for chromatograms) are read; every other array is counted
+    /// here and not decoded. An array with no name term is counted as
+    /// `"unnamed array"`.
+    pub fn skipped_arrays(&self) -> BTreeMap<String, u64> {
+        let mut all = self
+            .skipped
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        let chrom = self
+            .chrom_skipped
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for (name, n) in chrom.iter() {
+            *all.entry(name.clone()).or_default() += n;
+        }
+        all
+    }
+
+    /// Total of [`skipped_arrays`](Self::skipped_arrays).
+    pub fn skipped_array_count(&self) -> u64 {
+        self.skipped_arrays().values().sum()
+    }
+
+    /// One-line description of the skipped arrays for an ingest summary, or
+    /// `None` when none were skipped. Call after the spectra and
+    /// chromatograms are read.
+    pub fn skipped_arrays_summary(&self) -> Option<String> {
+        let by_array = self.skipped_arrays();
+        if by_array.is_empty() {
+            return None;
+        }
+        let total: u64 = by_array.values().sum();
+        let detail: Vec<String> = by_array
+            .iter()
+            .map(|(name, n)| format!("{name}: {n}"))
+            .collect();
+        Some(format!(
+            "skipped {total} binary data arrays that are not m/z or intensity ({})",
+            detail.join(", ")
+        ))
+    }
+
     /// Build the final [`Run`] record with the supplied counts and the
-    /// verbatim metadata blob attached.
+    /// verbatim metadata blob attached. When arrays were skipped, the blob
+    /// also has a `skipped_arrays` key with their `count` and `by_array`
+    /// counts; call this after [`read_chromatograms`](Self::read_chromatograms)
+    /// so the chromatogram arrays are included.
     pub fn finalize_run(self, spectrum_count: u32, ms1: u32, ms2: u32) -> MsResult<Run> {
+        let skipped = self.skipped_arrays();
         let mut run = self.base_run;
         run.spectrum_count = Some(spectrum_count);
         run.ms1_count = Some(ms1);
         run.ms2_count = Some(ms2);
-        run.run_metadata = Some(serde_json::to_string(&self.verbatim)?);
+        let meta = RunMetadataOut {
+            verbatim: &self.verbatim,
+            skipped_arrays: (!skipped.is_empty()).then(|| SkippedArraysMeta {
+                count: skipped.values().sum(),
+                by_array: &skipped,
+            }),
+        };
+        run.run_metadata = Some(serde_json::to_string(&meta)?);
         Ok(run)
     }
 }
@@ -359,7 +458,11 @@ fn attr_value_search(haystack: &str, name_attr: &str) -> Option<String> {
 
 // -- structured parsing --
 
-fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
+fn parse_one_spectrum(
+    xml: &str,
+    run_id: &str,
+    skipped: &mut BTreeMap<String, u64>,
+) -> MsResult<Spectrum> {
     let mut spec = Spectrum {
         run_id: run_id.to_string(),
         ..Default::default()
@@ -389,7 +492,7 @@ fn parse_one_spectrum(xml: &str, run_id: &str) -> MsResult<Spectrum> {
                 let name = bytes_to_string(e.name().as_ref());
                 if name == "binaryDataArray" {
                     if let Some(state) = current_binary.take() {
-                        state.apply_spectrum(&mut spec)?;
+                        state.apply_spectrum(&mut spec, skipped)?;
                     }
                 }
                 stack.pop();
@@ -565,7 +668,7 @@ fn apply_cv_to_spectrum(
                 | "MS:1002748" => {
                     b.unsupported = Some(acc.to_string());
                 }
-                _ => {}
+                _ => b.note_label(cv),
             }
             return;
         }
@@ -622,9 +725,18 @@ fn apply_cv_to_spectrum(
         }
         return;
     }
-    if context == "scan" && acc == "MS:1002476" {
-        spec.inv_mobility = val.and_then(|s| s.parse().ok());
-        return;
+    // Only `MS:1002815` (inverse reduced ion mobility, 1/K0) fills
+    // `inv_mobility`. `MS:1002476` (ion mobility drift time) is a different
+    // quantity and unit, so it stays in `cv_params` with the other scan terms,
+    // as does a 1/K0 value that is not a finite number.
+    if context == "scan" && acc == "MS:1002815" {
+        if let Some(v) = val
+            .and_then(|s| s.parse::<f64>().ok())
+            .filter(|v| v.is_finite())
+        {
+            spec.inv_mobility = Some(v);
+            return;
+        }
     }
 
     if context == "scanWindow" {
@@ -679,6 +791,9 @@ struct BinaryArrayState {
     zlib: bool,
     base64: String,
     unsupported: Option<String>,
+    /// Name of the first term of the array that is not a data type or
+    /// compression term, for example `mean ion mobility array`.
+    label: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -690,6 +805,37 @@ enum BinaryKind {
 }
 
 impl BinaryArrayState {
+    /// Remember the first term that names the array, so a skipped array can
+    /// be reported by name. Data type and compression terms do not name it.
+    fn note_label(&mut self, cv: &CvParam) {
+        const NOT_A_NAME: [&str; 7] = [
+            "MS:1000519", // 32-bit integer
+            "MS:1000521", // 32-bit float
+            "MS:1000522", // 64-bit integer
+            "MS:1000523", // 64-bit float
+            "MS:1000574", // zlib compression
+            "MS:1000576", // no compression
+            "MS:1001479", // null-terminated ASCII string
+        ];
+        if self.label.is_some() {
+            return;
+        }
+        if cv
+            .accession
+            .as_deref()
+            .is_some_and(|a| NOT_A_NAME.contains(&a))
+        {
+            return;
+        }
+        self.label = cv.name.clone().or_else(|| cv.accession.clone());
+    }
+
+    /// Count this array as skipped.
+    fn count_skipped(self, skipped: &mut BTreeMap<String, u64>) {
+        let name = self.label.unwrap_or_else(|| "unnamed array".to_string());
+        *skipped.entry(name).or_default() += 1;
+    }
+
     /// Decode the accumulated base64, ignoring the ASCII whitespace that
     /// line wrapping and character references such as `&#10;` leave behind.
     fn decode_base64(&self) -> MsResult<Vec<u8>> {
@@ -701,7 +847,11 @@ impl BinaryArrayState {
         Ok(base64::engine::general_purpose::STANDARD.decode(compact)?)
     }
 
-    fn apply_spectrum(self, spec: &mut Spectrum) -> MsResult<()> {
+    fn apply_spectrum(
+        self,
+        spec: &mut Spectrum,
+        skipped: &mut BTreeMap<String, u64>,
+    ) -> MsResult<()> {
         if let Some(u) = &self.unsupported {
             return Err(MsError::Unsupported(format!(
                 "compression codec {} not yet supported",
@@ -709,6 +859,7 @@ impl BinaryArrayState {
             )));
         }
         if matches!(self.kind, BinaryKind::Other) {
+            self.count_skipped(skipped);
             return Ok(());
         }
         let raw = self.decode_base64()?;
@@ -734,14 +885,25 @@ impl BinaryArrayState {
                 spec.intensity = decode_floats_f32(&bytes, precision)?;
                 spec.intensity_precision = Some(precision);
             }
-            BinaryKind::Other => {}
+            BinaryKind::Other => {} // counted and returned above
         }
         Ok(())
     }
 
-    fn apply_chromatogram(self, chrom: &mut Chromatogram) -> MsResult<()> {
-        if self.unsupported.is_some() {
-            return Err(MsError::Unsupported("compression not supported".into()));
+    fn apply_chromatogram(
+        self,
+        chrom: &mut Chromatogram,
+        skipped: &mut BTreeMap<String, u64>,
+    ) -> MsResult<()> {
+        if let Some(u) = &self.unsupported {
+            return Err(MsError::Unsupported(format!(
+                "compression codec {} not yet supported",
+                u
+            )));
+        }
+        if matches!(self.kind, BinaryKind::Other) {
+            self.count_skipped(skipped);
+            return Ok(());
         }
         let raw = self.decode_base64()?;
         let bytes = if self.zlib {
@@ -760,7 +922,7 @@ impl BinaryArrayState {
         match self.kind {
             BinaryKind::Mz => chrom.time = decode_floats_f32(&bytes, precision)?,
             BinaryKind::Intensity => chrom.intensity = decode_floats_f32(&bytes, precision)?,
-            BinaryKind::Other => {}
+            BinaryKind::Other => {} // counted and returned above
         }
         Ok(())
     }
@@ -862,7 +1024,11 @@ fn bytes_to_string(b: &str) -> String {
 
 // -- chromatograms --
 
-fn parse_chromatograms(body: &[u8], run_id: &str) -> MsResult<Vec<Chromatogram>> {
+fn parse_chromatograms(
+    body: &[u8],
+    run_id: &str,
+    skipped: &mut BTreeMap<String, u64>,
+) -> MsResult<Vec<Chromatogram>> {
     let mut out = Vec::new();
     let s = std::str::from_utf8(body).map_err(|e| MsError::Malformed(e.to_string()))?;
     let mut pos = 0;
@@ -872,13 +1038,21 @@ fn parse_chromatograms(body: &[u8], run_id: &str) -> MsResult<Vec<Chromatogram>>
             .find("</chromatogram>")
             .ok_or_else(|| MsError::Malformed("no </chromatogram>".into()))?;
         let elem_end = start + close_rel + "</chromatogram>".len();
-        out.push(parse_one_chromatogram(&s[start..elem_end], run_id)?);
+        out.push(parse_one_chromatogram(
+            &s[start..elem_end],
+            run_id,
+            skipped,
+        )?);
         pos = elem_end;
     }
     Ok(out)
 }
 
-fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
+fn parse_one_chromatogram(
+    xml: &str,
+    run_id: &str,
+    skipped: &mut BTreeMap<String, u64>,
+) -> MsResult<Chromatogram> {
     let mut chrom = Chromatogram {
         run_id: run_id.to_string(),
         ..Default::default()
@@ -912,7 +1086,7 @@ fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
                 let name = bytes_to_string(e.name().as_ref());
                 if name == "binaryDataArray" {
                     if let Some(state) = current_binary.take() {
-                        state.apply_chromatogram(&mut chrom)?;
+                        state.apply_chromatogram(&mut chrom, skipped)?;
                     }
                 }
                 stack.pop();
@@ -950,7 +1124,14 @@ fn parse_one_chromatogram(xml: &str, run_id: &str) -> MsResult<Chromatogram> {
                                 "MS:1000523" => b.precision = 64,
                                 "MS:1000521" => b.precision = 32,
                                 "MS:1000574" => b.zlib = true,
-                                _ => extra_cv.push(cv.clone().with_section(context)),
+                                "MS:1002312" | "MS:1002313" | "MS:1002314" | "MS:1002746"
+                                | "MS:1002747" | "MS:1002748" => {
+                                    b.unsupported = Some(acc.to_string());
+                                }
+                                _ => {
+                                    b.note_label(&cv);
+                                    extra_cv.push(cv.clone().with_section(context));
+                                }
                             }
                             continue;
                         }

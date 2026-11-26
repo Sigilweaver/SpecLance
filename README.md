@@ -25,7 +25,8 @@ Alpha. APIs and the on-disk schema may break without notice until 1.0.
 Implemented:
 
 - Ingest `.mzML` (streaming) into a store with `runs`, `spectra`, and
-  `chromatograms` tables.
+  `chromatograms` tables. Ingesting a file whose run is already in the store is refused (`Error::RunExists`, a Python
+  `OSError`) and writes nothing.
 - Ingest vendor raw data from all six formats `openmassspec-io` supports:
   Thermo `.raw`, Bruker timsTOF `.d`, Waters `.raw`, Agilent MassHunter
   `.d`, SCIEX `.wiff`, and Shimadzu LabSolutions `.lcd` / `.qgd`. Vendor
@@ -43,7 +44,7 @@ Implemented:
   `run_metadata` blocks. The output is a valid mzML for the spectra it
   carries, not a copy of the source.
 - **MS-Numpress is not supported.** Ingest stops with an error on any
-  Numpress-encoded array. Only uncompressed and zlib arrays are read.
+  Numpress-encoded array, in a spectrum or a chromatogram. Only uncompressed and zlib arrays are read.
 - **`scan_num` does not always match the source.** For mzML ingest it is
   the spectrum `index` + 1, not the scan number in the nativeID. The
   original nativeID is kept in `native_id`.
@@ -53,12 +54,20 @@ Implemented:
 - **Vendor ingest stores less than mzML ingest.** It writes no
   chromatograms, no `cv_params`, and no `run_metadata`, and `scan_num` is
   the vendor's scan number rather than a spectrum index + 1.
-- **Only m/z and intensity arrays are stored.** Other binary data arrays in an mzML spectrum are not read.
+- **Only m/z and intensity arrays are stored.** Other binary data arrays in an mzML spectrum or chromatogram (for
+  example a per-peak ion mobility array) are not decoded. Each ingest counts them by array name and reports the count
+  on stderr (CLI and Python), and records it in `runs.run_metadata` under `skipped_arrays`. The Python report is a plain
+  stderr line, not a `warnings` warning, and an array marked as non-standard data (`MS:1000786`) is counted under its
+  first term, not under its `value=` name.
 - **Intensity is stored as Float32.** A 64-bit intensity array is narrowed on ingest.
 - **Array precision is not used on export.** The writer does not read `mz_precision` or `intensity_precision`, and
   vendor ingest sets them to 64 and 32 rather than a source width.
 - **Ion mobility is one value per spectrum.** There is no per-peak mobility column and no ingest option for how a
   Bruker frame maps to rows.
+- **Drift time is not exported.** `inv_mobility` holds 1/K0 only. A scan-level drift time (`MS:1002476`) is kept in
+  `cv_params`, and export does not write `cv_params`. Runs from older mzML ingests can hold a drift time in
+  `inv_mobility`; nothing marks them. A file whose converter wrote a 1/K0 value under `MS:1002476` gets an empty
+  `inv_mobility`; the value stays in `cv_params` and is not exported.
 - **Vendor scan metadata without a column is dropped.** Thermo filter strings, Waters function types and Bruker
   accumulation times are not stored.
 - **No spectrum-library adapters.** The Python API has no conversion to `spectrum_utils`, `matchms`, `ms2ml`,
@@ -169,7 +178,8 @@ speclance-ms/       mzML reader (quick-xml) and writer, plus a vendor
 
 speclance-cli/      `speclance` binary.
                      ingest   - write a SpecLance store from mzML or,
-                                with --features all-vendors, vendor files
+                                with --features all-vendors, vendor files;
+                                refuses a run already in the store
                      runs     - list runs in a store
                      index    - build the default scalar indexes
                      query    - filter one run's spectra by RT / MS level
@@ -236,7 +246,7 @@ is self-contained and can be retrieved atomically.
 | isolation_window_upper   | Float64             | null for MS1                      |
 | activation               | Utf8                | HCD / CID / ECD / ETD / ...       |
 | collision_energy         | Float32             |                                   |
-| inv_mobility             | Float64             | Bruker 1/K0; null for other vendors|
+| inv_mobility             | Float64             | 1/K0 (`MS:1002815`); null if none  |
 | mz_precision             | UInt8               | 32 or 64 - source array width     |
 | intensity_precision      | UInt8               | 32 or 64 - source array width     |
 | scan_window_lower        | Float64             |                                   |
@@ -284,7 +294,10 @@ At the run level, `runs.run_metadata` holds the XML text of the mzML header
 `<instrumentConfigurationList>` and `<dataProcessingList>`) and of the footer,
 as a JSON object with the keys `prefix`, `spectrum_list_open`, `inter`,
 `chromatogram_list_open`, `suffix` and `indexed`. The blocks are kept as text
-and are not parsed. Vendor ingest leaves `run_metadata` null.
+and are not parsed. When the ingest skipped binary data arrays that are not
+m/z or intensity, the object also has `skipped_arrays`, with the total
+`count` and `by_array`, the count per array name. Vendor ingest leaves
+`run_metadata` null.
 
 Export builds the mzML from the typed columns through `openmassspec-core`. It
 does not read `cv_params` or `run_metadata`.
@@ -300,8 +313,15 @@ ingest returns `MsError::Unsupported`.
 ### 3. Ion mobility
 
 Each spectrum row has one `inv_mobility` value (Float64) and the schema has no
-per-peak mobility column. mzML ingest reads `inv_mobility` from the
-scan-level cvParam `MS:1002476`. Vendor ingest copies the value
+per-peak mobility column. `inv_mobility` is the inverse reduced ion mobility
+1/K0 in V s/cm^2. mzML ingest reads it from the scan-level cvParam `MS:1002815`
+(inverse reduced ion mobility), which is what `openmassspec-core` writes for a
+Bruker scan. A scan-level `MS:1002476` (ion mobility drift time, in
+milliseconds) is a different quantity, so it is not stored in `inv_mobility`;
+it stays in `cv_params` with its value and unit. A `MS:1002815` value that is
+not a number also stays in `cv_params`. Export writes `inv_mobility` as
+`MS:1002815` and does not write `cv_params`, so a drift time is not exported.
+Vendor ingest copies the value
 `openmassspec-io` returns, so Bruker rows are whatever frame or PASEF
 precursor records that crate produces. There is no ingest option to choose
 between collapsing and expanding the mobility dimension.
