@@ -52,8 +52,13 @@ Implemented:
   source path string and the file size, so the same file reached by a
   different path gets a different `run_id`.
 - **Vendor ingest stores less than mzML ingest.** It writes no
-  chromatograms, no `cv_params`, and no `run_metadata`, and `scan_num` is
-  the vendor's scan number rather than a spectrum index + 1.
+  chromatograms and no `run_metadata`. Its `cv_params` hold only what does
+  not fit a column (`openmassspec.collision_energies`, `openmassspec.scan_windows`,
+  `openmassspec.warnings`). `scan_num` is the vendor's scan number rather than a
+  spectrum index + 1.
+- **Older vendor-ingested stores differ in three columns.** They wrote a missing retention time as 0 s, an energy
+  of unknown unit (every Agilent Q-TOF MS/MS scan) as electronvolts, and the observed m/z range as the scan window.
+  Re-ingest the file to get the current values.
 - **Only m/z and intensity arrays are stored.** Other binary data arrays in an mzML spectrum or chromatogram (for
   example a per-peak ion mobility array) are not decoded. Each ingest counts them by array name and reports the count
   on stderr (CLI and Python), and records it in `runs.run_metadata` under `skipped_arrays`. The Python report is a plain
@@ -84,8 +89,6 @@ Implemented:
 - **No PyArrow / Polars output.** The Python API returns `dict`s and lists.
 - All runs share one set of tables; there is no per-run dataset layout.
 - mzML activation roundtrip is lossy in these cases:
-  - `PD` is not written. The writer returns `MsError::Unsupported` for a spectrum whose activation is `PD`,
-    because `openmassspec-core` 3.0.0 writes no term for it.
   - Older vendor-ingested stores hold long activation names. The reader parses them (`parse_activation` accepts the
     short names, these long names and other PSI-MS term names), but `SID` and `HCD` share one long name and read as
     `HCD`, and `EThcD` and `ETD` share one and read as `ETD`.
@@ -245,12 +248,12 @@ is self-contained and can be retrieved atomically.
 | isolation_window_lower   | Float64             | null for MS1                      |
 | isolation_window_upper   | Float64             | null for MS1                      |
 | activation               | Utf8                | HCD / CID / ECD / ETD / ...       |
-| collision_energy         | Float32             |                                   |
+| collision_energy         | Float32             | eV; null if not one energy in eV  |
 | inv_mobility             | Float64             | 1/K0 (`MS:1002815`); null if none  |
 | mz_precision             | UInt8               | 32 or 64 - source array width     |
 | intensity_precision      | UInt8               | 32 or 64 - source array width     |
-| scan_window_lower        | Float64             |                                   |
-| scan_window_upper        | Float64             |                                   |
+| scan_window_lower        | Float64             | instrument acquisition range      |
+| scan_window_upper        | Float64             | instrument acquisition range      |
 | mz                       | LargeList<Float64>  | peak m/z values                   |
 | intensity                | LargeList<Float32>  | peak intensity values             |
 | cv_params                | Utf8 (JSON)         | other CV params; not exported     |
@@ -285,8 +288,8 @@ activation, collision energy, `inv_mobility`, the scan window and the array
 precision. On mzML ingest, every other `cvParam` and `userParam` of a spectrum
 is serialized as JSON into `spectra.cv_params`, together with the XML section
 it appeared in; the column is null when there are none. Activation terms that
-the `activation` name accounts for are not repeated there. Vendor ingest
-leaves `cv_params` null.
+the `activation` name accounts for are not repeated there. Vendor ingest keeps in it only what no column holds
+(`openmassspec.collision_energies`, `openmassspec.scan_windows`, `openmassspec.warnings`).
 
 At the run level, `runs.run_metadata` holds the XML text of the mzML header
 (everything before `<spectrumList>`, which includes `<fileDescription>`,

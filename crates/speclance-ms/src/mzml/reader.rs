@@ -558,13 +558,33 @@ fn resolve_activation_terms(spec: &mut Spectrum, extra: &mut Vec<CvParam>) {
         .map(|&i| extra[i].accession.as_deref().unwrap_or(""))
         .collect();
     let (name, used) = crate::activation::resolve_activation(&accs);
-    spec.activation = name;
-    let drop: Vec<usize> = idx
+    let mut drop: Vec<usize> = idx
         .iter()
         .zip(used)
         .filter(|(_, u)| *u)
         .map(|(&i, _)| i)
         .collect();
+    spec.activation = name;
+    // `openmassspec-core` 4 writes an activation with no PSI-MS term (`PD`) as
+    // this userParam, and `unknown` when the reader stated none. The marker
+    // names the activation only when no PSI-MS term did; otherwise it stays
+    // in `cv_params` with the terms the name does not account for.
+    if let Some(i) = extra.iter().position(|c| {
+        c.section == "activation"
+            && c.kind == "user"
+            && c.name.as_deref() == Some(crate::activation::CORE_ACTIVATION_MARKER)
+    }) {
+        match extra[i].value.as_deref() {
+            Some("unknown") if spec.activation.is_none() => drop.push(i),
+            Some("pd") if spec.activation.is_none() => {
+                spec.activation = Some(crate::activation::activation_label(
+                    openmassspec_io::core::Activation::PD,
+                ));
+                drop.push(i);
+            }
+            _ => {}
+        }
+    }
     let mut i = 0;
     extra.retain(|_| {
         let keep = !drop.contains(&i);

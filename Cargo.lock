@@ -633,9 +633,9 @@ dependencies = [
 
 [[package]]
 name = "cfb"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f13298d9178622b7916ec5d01d470425c04273c8ed07e87b1c38b34c4f4612b"
+checksum = "fef29b910ef2b9dbecc60168d1568d643c633b0518af970c17e83bd5f6e2c94f"
 dependencies = [
  "fnv",
  "uuid",
@@ -1826,7 +1826,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3928,9 +3928,9 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "openaraw"
-version = "1.0.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb845b69804da12eff1eaadbc05a9d3dab31c637f450427abc484c7a9d4d7239"
+checksum = "5fc090767814fd10076df9ed14ea2aeffeb596f9ee9380e45d45a4c4e95b277a"
 dependencies = [
  "byteorder",
  "log",
@@ -3941,9 +3941,9 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-core"
-version = "3.0.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d11eb6376e628cb354ac492308d43de89994a4292bab74b8393bca5aa12fe463"
+checksum = "02d7ef176e333695889260a1e0ebb1d42a53c064aa92dffd59cbacba28a551af"
 dependencies = [
  "flate2",
  "serde",
@@ -3952,9 +3952,9 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71c7073fcb295e88883bc2b439d53c57d9a78fc4bed3675d7664869956d78737"
+checksum = "7e5b442ef0f69f10cff0052eb5b8d8fd45fef7f5788d97241c2e93d776082745"
 dependencies = [
  "openaraw",
  "openmassspec-core",
@@ -3974,9 +3974,9 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "opensxraw"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee42f58967c5aea601210afb056da4d00a75b041fae26482d44b5fd02a489ff3"
+checksum = "fa409949a729ba38217ecf5bce89a30ece2da119b1557754e388d9392eeeadf5"
 dependencies = [
  "byteorder",
  "cfb",
@@ -3987,9 +3987,9 @@ dependencies = [
 
 [[package]]
 name = "openszraw"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18fbdeeda0080dcbbde2095d56b67ff17ea6484a6ba5b364ac6bdf715159c541"
+checksum = "9694d9dab60e170a5b9d8eb0cf661b7143bffbc0d3fa816b2626018e9c24a379"
 dependencies = [
  "byteorder",
  "cfb",
@@ -4000,9 +4000,9 @@ dependencies = [
 
 [[package]]
 name = "opentfraw"
-version = "3.1.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aacff4dd9ec32e3f8662f8d42911ecd25374caa3ca153f228159a4ffc39c5ca8"
+checksum = "857171b9d28228bb4a48bbcaf96de9ee383f7329a3992cf5c874dc1619524aca"
 dependencies = [
  "openmassspec-core",
  "roxmltree",
@@ -4011,9 +4011,9 @@ dependencies = [
 
 [[package]]
 name = "opentimstdf"
-version = "3.0.1"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afe2ae30ddf71698db79f48bf0c2792af0d82fc49bb89ec3f588bfbd946a177e"
+checksum = "a77d07d57b8ed04c888c3eaf61623feb4e38658f3f8627cf3ff72e10b7688bc6"
 dependencies = [
  "log",
  "openmassspec-core",
@@ -4024,9 +4024,9 @@ dependencies = [
 
 [[package]]
 name = "openwraw"
-version = "4.0.0"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbde5766b6f6adb729a86cdc6ffe7d778e996af005da8143751e9edf2d718ab5"
+checksum = "d342d3965c28658f8d06b20471500205af74236bc69b69758a454822e6448c2d"
 dependencies = [
  "log",
  "openmassspec-core",
@@ -4471,7 +4471,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4813,9 +4813,9 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.42.0"
+version = "0.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4edff0039f148731aee2fd80f76dbfeb12d204ab3d1c544838d34e02151049b"
+checksum = "f172c4812a19b26d1c23cdb0070e69db335503dfa378b910eb857386e5b8beba"
 dependencies = [
  "bitflags 2.13.0",
  "fallible-iterator",
@@ -4851,7 +4851,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5511,10 +5511,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6072,7 +6072,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

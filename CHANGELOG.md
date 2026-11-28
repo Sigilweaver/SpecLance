@@ -8,6 +8,37 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Updated `openmassspec-io` to 3.0.0 (`openmassspec-core` 4 and the readers
+  released against it). Vendor ingest and the mzML writer follow it:
+  - A spectrum with no retention time keeps `rt` unset (the ingest wrote 0 s,
+    and the mzML writer wrote `rt` unset as 0 s). The writer refuses a run in
+    which only some spectra have one, naming the first that lacks it, and
+    declares a run with none to have no time axis.
+  - `collision_energy` holds one energy in electronvolts. A normalized energy,
+    an energy whose unit the file does not state, and stepped energies leave
+    it unset and are kept in the spectrum's `cv_params` under
+    `openmassspec.collision_energies` with their units. Before, an energy
+    whose unit the reader did not know (every Agilent Q-TOF MS/MS scan) was
+    stored as electronvolts. The writer writes the column back as
+    electronvolts.
+  - `scan_window_lower` and `scan_window_upper` hold the instrument's
+    acquisition range when the reader states exactly one window. They used to
+    hold the observed m/z range, which is not the instrument setting. Several
+    windows are kept in `cv_params` under `openmassspec.scan_windows`, and no
+    window is invented when the reader states none. The writer writes the
+    columns as the scan window and refuses a window with only one limit.
+  - The codes of the warnings a reader put on a spectrum (for example
+    `empty_spectrum`) are kept in `cv_params` under `openmassspec.warnings`.
+  - Activation `PD` is exported. `openmassspec-core` 4 writes it as an
+    `openmassspec: activation` userParam (`pd`), so the writer no longer
+    refuses it, and the mzML reader reads that userParam back as `PD`. The
+    `unknown` marker Core writes for a precursor with no activation reads back
+    as no activation and no longer stays in `cv_params`.
+  - A spectrum with no scan mode (`centroided` unset, for example every SCIEX
+    spectrum) is written with neither the profile nor the centroid term and
+    the warning `unknown_scan_mode`. `openmassspec-core` 4 refuses such a
+    spectrum by default, and 3 wrote it as a profile spectrum. Every other
+    check stays strict.
 - Release builds use thin LTO (`lto = "thin"`, `codegen-units = 1`). On a
   20,000-spectrum mzML benchmark the Python wheel's runtime is within 2% of fat
   LTO (inside run-to-run spread), the wheel is 2% larger, and the final crate

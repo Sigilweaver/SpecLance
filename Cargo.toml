@@ -43,15 +43,8 @@ quick-xml = { version = "0.42", features = ["serialize"] }
 flate2 = "1"
 memchr = "2"
 
-# Vendor readers. SpecLance no longer talks to these directly; everything
-# goes through `openmassspec-io`. They are kept as workspace deps so that
-# openmassspec-io's path resolution stays valid in transitive lookups.
-# Pinned to crates.io releases (no `path =`) so `cargo publish` and CI
-# checkouts work without a sibling-repo workspace.
-opentfraw = "1.4.0"
-opentimstdf = "1.3.3"
-openwraw = "1.2.9"
-openmassspec-io = "2.0.0"
+# Every vendor reader is reached through `openmassspec-io`.
+openmassspec-io = "3.0.0"
 
 # Internal crates
 speclance-core = { version = "=0.2.0-alpha", path = "crates/speclance-core" }

@@ -23,6 +23,10 @@
 //! | MS:1000136   | surface-induced dissociation                  | SID     |
 //! | MS:1000435   | photodissociation (synonyms multiphoton, MPD) | MPID    |
 //!
+//! `PD` has no PSI-MS term. `openmassspec-core` writes it as the userParam
+//! `openmassspec: activation` with value `pd` (and `unknown` for no
+//! activation), and the mzML reader reads the pair back.
+//!
 //! `MS:1002481` is the PSI-MS term named "higher energy beam-type collision-
 //! induced dissociation", which is HCD; it reads as `HCD`. The writer emits
 //! its parent `MS:1000422`. `MS:1000435` covers both multiphoton dissociation
@@ -34,6 +38,11 @@
 //! `MS:1002678` reads as `EThcD`, as does ETD with `MS:1002631`.
 
 use openmassspec_io::core::Activation as A;
+
+/// Name of the userParam `openmassspec-core` writes in `<activation>` for an
+/// activation that has no PSI-MS term (value `pd`) or that the reader did not
+/// state (value `unknown`).
+pub(crate) const CORE_ACTIVATION_MARKER: &str = "openmassspec: activation";
 
 /// Short name stored for an activation. Round-trips through [`parse_activation`]
 /// except `MPD`, which is an alias of `MPID`.

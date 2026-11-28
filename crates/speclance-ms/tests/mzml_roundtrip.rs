@@ -400,20 +400,35 @@ fn write_then_read_every_stored_activation() {
     }
 }
 
+/// `PD` has no PSI-MS term: Core writes the `openmassspec: activation`
+/// userParam, and the reader reads it back as `PD`.
 #[test]
-fn pd_cannot_be_written() {
-    let base = parse_bytes(TINY_MZML.as_bytes(), "tiny.mzML".into()).unwrap();
-    let mut buf = Vec::new();
-    let r = write_mzml(
-        &mut buf,
-        &base.run,
-        &[ms2_spectrum_with_activation("PD")],
-        &[],
-    );
+fn pd_is_written_and_read_back() {
+    let (xml, back) = write_and_read(ms2_spectrum_with_activation("PD"));
+    let start = xml.find("<activation>").unwrap();
+    let end = xml.find("</activation>").unwrap();
     assert!(
-        matches!(r, Err(speclance_ms::MsError::Unsupported(_))),
-        "{r:?}"
+        xml[start..end].contains(r#"name="openmassspec: activation" value="pd""#),
+        "{}",
+        &xml[start..end]
     );
+    assert_eq!(back.spectra[0].activation.as_deref(), Some("PD"));
+    assert_no_activation_in_cv_params(&back.spectra[0], "PD");
+    let cv = back.spectra[0].cv_params.as_deref().unwrap_or("");
+    assert!(!cv.contains("openmassspec: activation"), "{cv}");
+}
+
+/// A precursor with no activation is written with the `unknown` marker and
+/// reads back with no activation and nothing left in `cv_params`.
+#[test]
+fn no_activation_round_trips_as_none() {
+    let mut spec = ms2_spectrum_with_activation("HCD");
+    spec.activation = None;
+    let (xml, back) = write_and_read(spec);
+    assert!(xml.contains(r#"name="openmassspec: activation" value="unknown""#));
+    assert_eq!(back.spectra[0].activation, None);
+    let cv = back.spectra[0].cv_params.as_deref().unwrap_or("");
+    assert!(!cv.contains("openmassspec: activation"), "{cv}");
 }
 
 #[test]

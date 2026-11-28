@@ -12,7 +12,7 @@
 
 use std::path::Path;
 
-use openmassspec_io::core::{Polarity, RunMetadata, ScanMode, SpectrumRecord};
+use openmassspec_io::core::{CollisionEnergyUnit, Polarity, RunMetadata, ScanMode, SpectrumRecord};
 use openmassspec_io::{detect_format, VendorFormat};
 use sha2::{Digest, Sha256};
 use speclance_core::{Chromatogram, Precursor, Run, Spectrum};
@@ -137,26 +137,17 @@ fn record_to_spectrum(run_id: &str, rec: &SpectrumRecord) -> Spectrum {
         .and_then(|p| p.activation)
         .map(crate::activation::activation_label);
 
-    // `ce_is_nce` flips the unit; SpecLance's column is just an f32, so we drop
-    // normalized values rather than report them in the wrong unit.
-    let collision_energy = rec
-        .precursor
-        .as_ref()
-        .and_then(|p| {
-            if p.ce_is_nce {
-                None
-            } else {
-                p.collision_energy
-            }
-        })
-        .map(|e| e as f32);
+    let collision_energy = column_collision_energy(rec);
+    let scan_window = column_scan_window(rec);
+    let cv_params = kept_in_cv_params(rec, collision_energy.is_some(), scan_window.is_some());
 
     Spectrum {
         run_id: run_id.to_string(),
         scan_num: rec.scan_number,
         native_id: Some(rec.native_id.clone()),
         ms_level: rec.ms_level as u8,
-        rt: Some(rec.retention_time_sec),
+        // A missing retention time stays missing; it is never written as 0.
+        rt: rec.retention_time_sec,
         tic: rec.total_ion_current,
         base_peak_mz: rec.base_peak_mz,
         base_peak_intensity: rec.base_peak_intensity,
@@ -168,12 +159,78 @@ fn record_to_spectrum(run_id: &str, rec: &SpectrumRecord) -> Spectrum {
         inv_mobility: rec.inv_mobility,
         mz_precision: Some(64),
         intensity_precision: Some(32),
-        scan_window_lower: rec.low_mz,
-        scan_window_upper: rec.high_mz,
+        scan_window_lower: scan_window.map(|w| w.0),
+        scan_window_upper: scan_window.map(|w| w.1),
         mz: rec.mz.clone(),
         intensity: rec.intensity.clone(),
-        cv_params: None,
+        cv_params,
     }
+}
+
+/// The value of the `collision_energy` column: one energy whose unit is
+/// electronvolts. The column is a bare number in eV, so a normalized energy,
+/// an energy whose unit the file does not state, and stepped energies are
+/// not stored here; [`kept_in_cv_params`] keeps them.
+fn column_collision_energy(rec: &SpectrumRecord) -> Option<f32> {
+    match rec.precursor.as_ref()?.collision_energies.as_slice() {
+        [ce] if ce.unit == Some(CollisionEnergyUnit::Ev) => Some(ce.value as f32),
+        _ => None,
+    }
+}
+
+/// The instrument's acquisition range, when the reader states exactly one.
+/// The observed m/z range (`low_mz`, `high_mz`) is a different quantity and
+/// is not stored as the scan window.
+fn column_scan_window(rec: &SpectrumRecord) -> Option<(f64, f64)> {
+    match rec.scan_windows.as_slice() {
+        [w] => Some((w.lower, w.upper)),
+        _ => None,
+    }
+}
+
+/// What the typed columns cannot hold, as the `cv_params` JSON blob: the
+/// collision energies (with units) when `collision_energy` is empty, the scan
+/// windows when `scan_window_*` is empty, and the codes of the warnings the
+/// reader put on the record. Nothing the reader stated is dropped on the way
+/// into the store.
+fn kept_in_cv_params(
+    rec: &SpectrumRecord,
+    has_ce_column: bool,
+    has_window_columns: bool,
+) -> Option<String> {
+    let mut kept = serde_json::Map::new();
+    if !has_ce_column {
+        if let Some(p) = rec
+            .precursor
+            .as_ref()
+            .filter(|p| !p.collision_energies.is_empty())
+        {
+            let list: Vec<_> = p
+                .collision_energies
+                .iter()
+                .map(|ce| {
+                    serde_json::json!({
+                        "value": ce.value,
+                        "unit": ce.unit.map(CollisionEnergyUnit::as_str),
+                    })
+                })
+                .collect();
+            kept.insert("openmassspec.collision_energies".into(), list.into());
+        }
+    }
+    if !has_window_columns && !rec.scan_windows.is_empty() {
+        let list: Vec<_> = rec
+            .scan_windows
+            .iter()
+            .map(|w| serde_json::json!({"lower": w.lower, "upper": w.upper}))
+            .collect();
+        kept.insert("openmassspec.scan_windows".into(), list.into());
+    }
+    if !rec.warnings.is_empty() {
+        let codes: Vec<_> = rec.warnings.iter().map(|w| w.kind.code()).collect();
+        kept.insert("openmassspec.warnings".into(), codes.into());
+    }
+    (!kept.is_empty()).then(|| serde_json::Value::Object(kept).to_string())
 }
 
 /// Total bytes on disk for a vendor bundle. Handles both single-file
@@ -221,6 +278,112 @@ mod tests {
         std::fs::write(dir.path().join("b.bin"), [0u8; 5]).unwrap();
         assert_eq!(path_size(dir.path()).unwrap(), 15);
         assert_eq!(path_size(&dir.path().join("a.bin")).unwrap(), 10);
+    }
+
+    use openmassspec_io::core::{PrecursorInfo, Warning, WarningKind};
+
+    fn record() -> SpectrumRecord {
+        SpectrumRecord::new(0, 1, "scan=1")
+            .with_ms_level(2)
+            .with_scan_mode(ScanMode::Centroid)
+            .with_retention_time_sec(12.5)
+            .with_peaks(vec![100.0, 200.0], vec![1.0, 2.0])
+    }
+
+    fn cv(s: &Spectrum) -> serde_json::Value {
+        serde_json::from_str(s.cv_params.as_deref().expect("cv_params kept")).unwrap()
+    }
+
+    #[test]
+    fn a_missing_retention_time_stays_missing() {
+        let with = record_to_spectrum("r", &record());
+        assert_eq!(with.rt, Some(12.5));
+        let mut rec = record();
+        rec.retention_time_sec = None;
+        assert_eq!(record_to_spectrum("r", &rec).rt, None);
+    }
+
+    #[test]
+    fn one_electronvolt_energy_fills_the_column() {
+        let rec = record().with_precursor(
+            PrecursorInfo::default().with_collision_energy(35.0, CollisionEnergyUnit::Ev),
+        );
+        let s = record_to_spectrum("r", &rec);
+        assert_eq!(s.collision_energy, Some(35.0));
+        assert!(s.cv_params.is_none(), "{:?}", s.cv_params);
+    }
+
+    #[test]
+    fn other_energies_stay_out_of_the_ev_column_and_are_kept() {
+        let cases = [
+            (
+                PrecursorInfo::default().with_collision_energy(30.0, CollisionEnergyUnit::Nce),
+                serde_json::json!([{"value": 30.0, "unit": "nce"}]),
+            ),
+            (
+                // A value whose unit the file does not state is not eV.
+                PrecursorInfo::default().with_collision_energy(30.0, None::<CollisionEnergyUnit>),
+                serde_json::json!([{"value": 30.0, "unit": null}]),
+            ),
+            (
+                PrecursorInfo::default()
+                    .with_collision_energy(20.0, CollisionEnergyUnit::Ev)
+                    .with_collision_energy(30.0, CollisionEnergyUnit::Ev),
+                serde_json::json!([
+                    {"value": 20.0, "unit": "ev"},
+                    {"value": 30.0, "unit": "ev"}
+                ]),
+            ),
+        ];
+        for (precursor, kept) in cases {
+            let s = record_to_spectrum("r", &record().with_precursor(precursor));
+            assert_eq!(s.collision_energy, None);
+            assert_eq!(cv(&s)["openmassspec.collision_energies"], kept);
+        }
+    }
+
+    #[test]
+    fn the_scan_window_is_the_stated_range_not_the_observed_one() {
+        let mut rec = record().with_scan_window(50.0, 1500.0);
+        rec.low_mz = Some(100.0);
+        rec.high_mz = Some(200.0);
+        let s = record_to_spectrum("r", &rec);
+        assert_eq!(
+            (s.scan_window_lower, s.scan_window_upper),
+            (Some(50.0), Some(1500.0))
+        );
+
+        // No stated window: the observed range does not stand in for it.
+        let mut rec = record();
+        rec.low_mz = Some(100.0);
+        rec.high_mz = Some(200.0);
+        let s = record_to_spectrum("r", &rec);
+        assert_eq!((s.scan_window_lower, s.scan_window_upper), (None, None));
+        assert!(s.cv_params.is_none());
+
+        // Several windows do not fit two columns and are kept.
+        let rec = record()
+            .with_scan_window(50.0, 500.0)
+            .with_scan_window(500.0, 1500.0);
+        let s = record_to_spectrum("r", &rec);
+        assert_eq!(s.scan_window_lower, None);
+        assert_eq!(
+            cv(&s)["openmassspec.scan_windows"],
+            serde_json::json!([
+                {"lower": 50.0, "upper": 500.0},
+                {"lower": 500.0, "upper": 1500.0}
+            ])
+        );
+    }
+
+    #[test]
+    fn reader_warnings_are_kept_by_code() {
+        let rec = record().with_warning(Warning::new(WarningKind::EmptySpectrum, "no peaks"));
+        let s = record_to_spectrum("r", &rec);
+        assert_eq!(
+            cv(&s)["openmassspec.warnings"],
+            serde_json::json!(["empty_spectrum"])
+        );
     }
 
     #[test]
