@@ -3952,9 +3952,9 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io"
-version = "2.0.0"
+version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71c7073fcb295e88883bc2b439d53c57d9a78fc4bed3675d7664869956d78737"
+checksum = "fd4f5f738b35831e085b2d76fceaac1255fcde3826482bf162be47f3bfc93473"
 dependencies = [
  "openaraw",
  "openmassspec-core",
@@ -4000,9 +4000,9 @@ dependencies = [
 
 [[package]]
 name = "opentfraw"
-version = "3.1.0"
+version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aacff4dd9ec32e3f8662f8d42911ecd25374caa3ca153f228159a4ffc39c5ca8"
+checksum = "80dbce17dbfeb751adc8c349f8cb2a9554605ed100290e84908cd9cf9e0f26b2"
 dependencies = [
  "openmassspec-core",
  "roxmltree",
@@ -4024,9 +4024,9 @@ dependencies = [
 
 [[package]]
 name = "openwraw"
-version = "4.0.0"
+version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbde5766b6f6adb729a86cdc6ffe7d778e996af005da8143751e9edf2d718ab5"
+checksum = "14d77fb63fa2dcb426d811038e5b7424156e3f2f14806a1a68889e07d52f016a"
 dependencies = [
  "log",
  "openmassspec-core",
