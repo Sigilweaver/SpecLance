@@ -43,35 +43,12 @@ quick-xml = { version = "0.42", features = ["serialize"] }
 flate2 = "1"
 memchr = "2"
 
-# Vendor readers. SpecLance no longer talks to these directly; everything
-# goes through `openmassspec-io`. They are kept as workspace deps so that
-# openmassspec-io's path resolution stays valid in transitive lookups.
-# Pinned to crates.io releases (no `path =`) so `cargo publish` and CI
-# checkouts work without a sibling-repo workspace.
-opentfraw = "1.4.0"
-opentimstdf = "1.3.3"
-openwraw = "1.2.9"
+# Every vendor reader is reached through `openmassspec-io`.
 openmassspec-io = "3.0.0"
 
 # Internal crates
 speclance-core = { version = "=0.2.0-alpha", path = "crates/speclance-core" }
 speclance-ms = { version = "=0.2.0-alpha", path = "crates/speclance-ms" }
-
-# Temporary: openmassspec-io 3, openmassspec-core 4 and the six readers are
-# not on crates.io yet. Every entry pins a commit. A patch in a dependency's
-# own workspace is ignored, so the reader and Core pins that
-# OpenMassSpec/Cargo.toml carries are repeated here. Remove this block and
-# release against crates.io when they are published.
-[patch.crates-io]
-openmassspec-io = { git = "https://github.com/Sigilweaver/OpenMassSpec", rev = "3c613bc17844a22877c66a4f685892a5e263f55f" }
-openmassspec-core = { git = "https://github.com/Sigilweaver/OpenMassSpecCore", rev = "ab7b7f7851cc26e518688d04a144c7fc0c42afd5" }
-openmassspec-arrow = { git = "https://github.com/Sigilweaver/OpenMassSpecCore", rev = "ab7b7f7851cc26e518688d04a144c7fc0c42afd5" }
-opentfraw = { git = "https://github.com/Sigilweaver/OpenTFRaw", rev = "b069696083e2c932c53e281c1ea03246fe05cf18" }
-openwraw = { git = "https://github.com/Sigilweaver/OpenWRaw", rev = "2c05e3c956ca6ab4e54716aac47faca48fa401e6" }
-opentimstdf = { git = "https://github.com/Sigilweaver/OpenTimsTDF", rev = "ebead58a4a8612b9c13dc56b4523533fb3618fe6" }
-openaraw = { git = "https://github.com/Sigilweaver/OpenARaw", rev = "d5c12a236ad7cbf354f6f2d789a31bec1995d166" }
-opensxraw = { git = "https://github.com/Sigilweaver/OpenSXRaw", rev = "330ab80e5416847dfdca63080bb4d4b3c3a1c2b8" }
-openszraw = { git = "https://github.com/Sigilweaver/OpenSZRaw", rev = "b2da100496620535c300ebb1541a5c1c6c7d36d1" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
