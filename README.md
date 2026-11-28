@@ -288,8 +288,8 @@ activation, collision energy, `inv_mobility`, the scan window and the array
 precision. On mzML ingest, every other `cvParam` and `userParam` of a spectrum
 is serialized as JSON into `spectra.cv_params`, together with the XML section
 it appeared in; the column is null when there are none. Activation terms that
-the `activation` name accounts for are not repeated there. Vendor ingest
-leaves `cv_params` null.
+the `activation` name accounts for are not repeated there. Vendor ingest keeps in it only what no column holds
+(`openmassspec.collision_energies`, `openmassspec.scan_windows`, `openmassspec.warnings`).
 
 At the run level, `runs.run_metadata` holds the XML text of the mzML header
 (everything before `<spectrumList>`, which includes `<fileDescription>`,
